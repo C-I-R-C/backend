@@ -9,6 +9,7 @@ namespace WebApplication1.Controllers
     namespace WebApplication1.Controllers
     {
         [Route("api/[controller]")]
+
         [ApiController]
         public class UniversalController<T> : ControllerBase where T : class
         {
@@ -27,6 +28,7 @@ namespace WebApplication1.Controllers
             }
 
             [HttpPost]
+
             public ActionResult<T> Add([FromBody] T entity) => throw new NotImplementedException();
 
             [HttpPut("{id}")]
@@ -97,6 +99,7 @@ namespace WebApplication1.Controllers
         public class FlowerController : UniversalController<Flower>
         {
         [HttpPatch("{id}/increase-stock")]
+
         public ActionResult<Flower> IncreaseStock(int id, [FromBody] int amountToAdd) => throw new NotImplementedException();
         [HttpGet("{FlowerId}/check-stock")]
         public ActionResult<StockCheckResult> CheckStock(int FlowerId, [FromQuery] int requiredAmount) => throw new NotImplementedException();
@@ -105,11 +108,13 @@ namespace WebApplication1.Controllers
         {
             [HttpPatch("{id}/increase-stock")]
             public ActionResult<Box> IncreaseStock(int id, [FromBody] int amountToAdd) => throw new NotImplementedException();
+
             [HttpGet("{BoxId}/check-stock")]
             public ActionResult<Box> CheckStock(int BoxId, [FromQuery] int requiredAmount) => throw new NotImplementedException();
         }
         public class IngreController : UniversalController<Ingredient>
         {
+
             [HttpPatch("{id}/increase-stock")]
             public ActionResult<Box> IncreaseStock(int id, [FromBody] int amountToAdd) => throw new NotImplementedException();
             [HttpGet("{BoxId}/check-stock")]
