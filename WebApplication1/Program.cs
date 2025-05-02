@@ -8,6 +8,17 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+// Register filter services
+builder.Services.AddScoped<ValidateModelAttribute>();
+builder.Services.AddScoped<LogActionFilter>();
+builder.Services.AddScoped<ConcurrencyCheckFilter>();
+builder.Services.AddScoped<StockModificationFilter>();
+builder.Services.AddScoped<ClientPhoneNumberFormatFilter>();
+builder.Services.AddScoped<OrderPriorityFilter>();
+builder.Services.AddScoped<ETagFilter>();
+builder.Services.AddScoped<CacheResponseFilter>();
+
+// Register with parameters
 
 var app = builder.Build();
 

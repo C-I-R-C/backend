@@ -62,11 +62,7 @@ namespace WebApplication1
         public string Name { get; set; }
         public int InStock { get; set; }
         public decimal CostPerUnit { get; set; }
-
-        // Many-to-many with Ingredients through FlowerIngredient
         public ICollection<FlowerIngredient> FlowerIngredients { get; set; } = new List<FlowerIngredient>();
-
-        // One-to-many with Colors (if flowers can have colors)
         public int? ColorId { get; set; }
         public Color Color { get; set; }
     }
