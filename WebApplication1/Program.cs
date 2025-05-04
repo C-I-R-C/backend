@@ -17,6 +17,7 @@ builder.Services.AddScoped<ClientPhoneNumberFormatFilter>();
 builder.Services.AddScoped<OrderPriorityFilter>();
 builder.Services.AddScoped<ETagFilter>();
 builder.Services.AddScoped<CacheResponseFilter>();
+builder.Services.AddSingleton<DataService>();
 
 // Register with parameters
 

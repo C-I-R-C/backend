@@ -97,4 +97,74 @@ namespace WebApplication1
         public string Name { get; set; }
         public bool IsNatural { get; set; } 
     }
+    public class DataService
+    {
+        public List<Client> Clients { get; } = new()
+    {
+        new Client { Id = 1, Name = "Emma Johnson", PhoneNumber = "+1 555-0101", TotalOrdersCount = 5, DiscountLevel = 10 },
+        new Client { Id = 2, Name = "James Smith", PhoneNumber = "+1 555-0102", TotalOrdersCount = 2, DiscountLevel = 5 },
+        new Client { Id = 3, Name = "Olivia Williams", PhoneNumber = "+1 555-0103", TotalOrdersCount = 8, DiscountLevel = 15 },
+        new Client { Id = 4, Name = "Liam Brown", PhoneNumber = "+1 555-0104", TotalOrdersCount = 1, DiscountLevel = 0 },
+        new Client { Id = 5, Name = "Sophia Jones", PhoneNumber = "+1 555-0105", TotalOrdersCount = 12, DiscountLevel = 20 }
+    };
+
+        public List<Order> Orders { get; } = new()
+    {
+       new Order
+        {
+            Id = 1,
+            ClientId = 1, // Emma Johnson
+            OrderDate = DateTime.UtcNow.AddDays(-5),
+            TotalPrice = 89.97m,
+            IsCurrent = false,
+            Comment = "Wedding bouquet",
+            OrderItems = new List<OrderItem>
+            {
+                new OrderItem { Id = 1, ItemId = 1, Quantity = 2, UnitPrice = 25.99m },
+                new OrderItem { Id = 2, ItemId = 3, Quantity = 1, UnitPrice = 37.99m }
+            }
+        },
+        new Order
+        {
+            Id = 2,
+            ClientId = 3, // Olivia Williams
+            OrderDate = DateTime.UtcNow.AddDays(-2),
+            TotalPrice = 45.98m,
+            IsCurrent = true,
+            Comment = "Birthday flowers",
+            OrderItems = new List<OrderItem>
+            {
+                new OrderItem { Id = 3, ItemId = 2, Quantity = 1, UnitPrice = 19.99m },
+                new OrderItem { Id = 4, ItemId = 1, Quantity = 1, UnitPrice = 25.99m }
+            }
+        },
+        new Order
+        {
+            Id = 3,
+            ClientId = 1, // Emma Johnson (repeat customer)
+            OrderDate = DateTime.UtcNow,
+            TotalPrice = 199.99m,
+            IsCurrent = true,
+            Comment = "Anniversary arrangement",
+            OrderItems = new List<OrderItem>
+            {
+                new OrderItem { Id = 5, ItemId = 3, Quantity = 1, UnitPrice = 199.99m }
+            }
+        }
+    };
+        public List<Item> Items = new List<Item>
+        {
+            new Item { Id = 1, Name = "Rose Bouquet", BasePrice = 25.99m },
+            new Item { Id = 2, Name = "Tulip Arrangement", BasePrice = 19.99m },
+            new Item { Id = 3, Name = "Wedding Flowers", BasePrice = 199.99m }
+        };
+        public int NextClientId => Clients.Max(c => c.Id);
+        public int NextOrderId => Orders.Max(o => o.Id)+1;
+        public int NextOrderItemId =>
+        Orders.SelectMany(o => o.OrderItems).Any()
+            ? Orders.SelectMany(o => o.OrderItems).Max(oi => oi.Id)
+            : 1;
+        public int NextItemId => Items.Any() ? Items.Max(i => i.Id) + 1 : 1;
+
+    }
 }

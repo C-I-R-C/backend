@@ -1,107 +1,457 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Concurrent;
+using System.ComponentModel.DataAnnotations;
 namespace WebApplication1.Controllers
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    [ServiceFilter(typeof(TimingFilter))]
-    [ServiceFilter(typeof(LogActionFilter))]
-    public class UniversalController<T> : ControllerBase where T : class
+    public class ClientWithOrdersDto
     {
-        [HttpGet]
-        //[ServiceFilter(typeof(CacheResponseFilter), Arguments = new object[] { "30" })] 
-        public ActionResult<IEnumerable<T>> GetAll() => throw new NotImplementedException();
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string PhoneNumber { get; set; }
+        public int TotalOrdersCount { get; set; }
+        public int DiscountLevel { get; set; }
 
+        public List<OrderSummaryDto> Orders { get; set; } = new();
+    }
+
+    public class OrderSummaryDto
+    {
+        public int Id { get; set; }
+        public DateTime OrderDate { get; set; }
+        public decimal TotalPrice { get; set; }
+        public bool IsCurrent { get; set; }
+    }
+    public class OrderWithClientDto
+    {
+        public int Id { get; set; }
+        public DateTime OrderDate { get; set; }
+        public decimal TotalPrice { get; set; }
+        public bool IsCurrent { get; set; }
+        public string Comment { get; set; }
+
+        public ClientInfoDto Client { get; set; }
+        public List<OrderItemDto> Items { get; set; } = new();
+    }
+
+    public class ClientInfoDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public int DiscountLevel { get; set; }
+    }
+    [ApiController]
+    [Route("api/[controller]")]
+    public class ClientsController : ControllerBase
+    {
+        private readonly DataService _data;
+
+        public ClientsController(DataService data)
+        {
+            _data = data;
+        }
+        
+        public class ClientResponseDto
+        {
+            public int Id { get; set; }
+            public string Name { get; set; }
+            public string PhoneNumber { get; set; }
+            public int TotalOrdersCount { get; set; }
+            public int DiscountLevel { get; set; }
+
+            // Optionally include summary order info
+            public decimal TotalSpent { get; set; }
+            public DateTime? LastOrderDate { get; set; }
+        }
+        public class ClientCreateDto
+        {
+            [Required]
+            [StringLength(100, MinimumLength = 2)]
+            public string Name { get; set; }
+
+            [Phone]
+            [StringLength(20)]
+            public string PhoneNumber { get; set; }
+
+            [Range(0, 100)]
+            public int DiscountLevel { get; set; } = 0;
+        }
+        public class ClientUpdateDto
+        {
+            [StringLength(100, MinimumLength = 2)]
+            public string Name { get; set; }
+
+            [Phone]
+            [StringLength(20)]
+            public string PhoneNumber { get; set; }
+
+            [Range(0, 100)]
+            public int? DiscountLevel { get; set; }
+        }
+
+        
+
+        // GET api/clients
+        [HttpGet]
+        public ActionResult<IEnumerable<ClientResponseDto>> GetAll()
+        {
+            var clients = _data.Clients.Select(c => new ClientResponseDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                PhoneNumber = c.PhoneNumber,
+                TotalOrdersCount = c.TotalOrdersCount,
+                DiscountLevel = c.DiscountLevel,
+                TotalSpent = CalculateTotalSpent(c.Id),
+                LastOrderDate = GetLastOrderDate(c.Id)
+            });
+
+            return Ok(clients);
+        }
+        [HttpGet("{id}/orders")]
+        public ActionResult<ClientWithOrdersDto> GetClientWithOrders(int id)
+        {
+            var client = _data.Clients.FirstOrDefault(c => c.Id == id);
+            if (client == null) return NotFound();
+
+            var result = new ClientWithOrdersDto
+            {
+                Id = client.Id,
+                Name = client.Name,
+                PhoneNumber = client.PhoneNumber,
+                TotalOrdersCount = client.TotalOrdersCount,
+                DiscountLevel = client.DiscountLevel,
+                Orders = _data.Orders 
+                    .Where(o => o.ClientId == id)
+                    .Select(o => new OrderSummaryDto
+                    {
+                        Id = o.Id,
+                        OrderDate = o.OrderDate,
+                        TotalPrice = o.TotalPrice,
+                        IsCurrent = o.IsCurrent
+                    })
+                    .ToList()
+            };
+
+            return Ok(result);
+        }
         [HttpGet("{id}")]
-        [ServiceFilter(typeof(ETagFilter))]
-        public ActionResult<T> GetById(int id) => throw new NotImplementedException();
+        public ActionResult<ClientResponseDto> GetById(int id)
+        {
+            var client = _data.Clients.FirstOrDefault(c => c.Id == id);
+            if (client == null) return NotFound();
+
+            return Ok(new ClientResponseDto
+            {
+                Id = client.Id,
+                Name = client.Name,
+                PhoneNumber = client.PhoneNumber,
+                TotalOrdersCount = client.TotalOrdersCount,
+                DiscountLevel = client.DiscountLevel,
+                TotalSpent = CalculateTotalSpent(client.Id),
+                LastOrderDate = GetLastOrderDate(client.Id)
+            });
+        }
 
         [HttpPost]
-        [ServiceFilter(typeof(ValidateModelAttribute))]
-        public virtual ActionResult<T> Add([FromBody] T entity) => throw new NotImplementedException();
+        public ActionResult<ClientResponseDto> Create([FromBody] ClientCreateDto clientDto)
+        {
+            var client = new Client
+            {
+                Id = _data.NextClientId+1,
+                Name = clientDto.Name,
+                PhoneNumber = clientDto.PhoneNumber,
+                DiscountLevel = clientDto.DiscountLevel,
+                TotalOrdersCount = 0
+            };
 
+            _data.Clients.Add(client);
+
+            return CreatedAtAction(nameof(GetById), new { id = client.Id },
+                new ClientResponseDto
+                {
+                    Id = client.Id,
+                    Name = client.Name,
+                    PhoneNumber = client.PhoneNumber,
+                    TotalOrdersCount = 0,
+                    DiscountLevel = client.DiscountLevel
+                });
+        }
+
+        // PUT api/clients/5
         [HttpPut("{id}")]
-        [ServiceFilter(typeof(ValidateModelAttribute))]
-        [ServiceFilter(typeof(ConcurrencyCheckFilter))]
-        public IActionResult Update(int id, [FromBody] T entity) => throw new NotImplementedException();
+        public IActionResult Update(int id, [FromBody] ClientUpdateDto clientDto)
+        {
+            var client = _data.Clients.FirstOrDefault(c => c.Id == id);
+            if (client == null) return NotFound();
 
+            if (!string.IsNullOrEmpty(clientDto.Name))
+                client.Name = clientDto.Name;
+
+            if (!string.IsNullOrEmpty(clientDto.PhoneNumber))
+                client.PhoneNumber = clientDto.PhoneNumber;
+
+            if (clientDto.DiscountLevel.HasValue)
+                client.DiscountLevel = clientDto.DiscountLevel.Value;
+
+            return NoContent();
+        }
+
+        // DELETE api/clients/5 (unchanged)
         [HttpDelete("{id}")]
-        //[ServiceFilter(typeof(RoleBasedAuthFilter), Arguments = new object[] { "Admin" })]
-        public IActionResult Delete(int id) => throw new NotImplementedException();
+        public IActionResult Delete(int id)
+        {
+            var client = _data.Clients.FirstOrDefault(c => c.Id == id);
+            if (client == null) return NotFound();
+
+            _data.Clients.Remove(client);
+            return NoContent();
+        }
+
+        private decimal CalculateTotalSpent(int clientId)
+        {
+            // Implement logic to calculate total spent by client
+            // You'll need access to orders data
+            return 0m; // Placeholder
+        }
+
+        private DateTime? GetLastOrderDate(int clientId)
+        {
+            // Implement logic to get last order date
+            // You'll need access to orders data
+            return null; // Placeholder
+        }
     }
-    [Route("api/[controller]")]
     [ApiController]
-    public class ClientsController : UniversalController<Client>
+    [Route("api/[controller]")]
+    public class OrdersController : ControllerBase
     {
-            [HttpGet("by-number/{phoneNumber}")]
-            [ServiceFilter(typeof(ClientPhoneNumberFormatFilter))]
-            public ActionResult<Client> GetClientByPhoneNumber(string phoneNumber) => throw new NotImplementedException();
+        private readonly DataService _data;
 
-            [HttpGet("by-name/{name}")]
-            //[ServiceFilter(typeof(CacheResponseFilter), Arguments = new object[] { "60" })] // Cache for 1 minute
-            public ActionResult<Client> GetClientByName(string name) => throw new NotImplementedException();
-    }
-    [Route("api/[controller]")]
-    [ApiController]
-    public class OrdersController : UniversalController<Order>
+        public OrdersController(DataService data)
         {
-            [HttpPost("add order")]
-            [ServiceFilter(typeof(OrderPriorityFilter))]
-            [ServiceFilter(typeof(StockAvailabilityFilter))] 
-            public override ActionResult<Order> Add([FromBody] Order entity) => base.Add(entity);
-
-            [HttpGet("most-urgent")]
-            //[ServiceFilter(typeof(RoleBasedAuthFilter), Arguments = new object[] { "Manager" })]
-            public ActionResult<IEnumerable<Order>> GetMostUrgentOrders() => throw new NotImplementedException();
+            _data = data;
         }
-    [Route("api/[controller]")]
-    [ApiController]
-    public class FlowerController : UniversalController<Flower>
-        {
-            [HttpPatch("{id}/increase-stock")]
-            [ServiceFilter(typeof(StockModificationFilter))]
-            [ServiceFilter(typeof(ValidateModelAttribute))]
-            public ActionResult<Flower> IncreaseStock(int id, [FromBody] int amountToAdd) => throw new NotImplementedException();
 
-            [HttpGet("{flowerId}/check-stock")]
-            //[ServiceFilter(typeof(CacheResponseFilter), Arguments = new object[] { "5" })] // Short cache
-           
-        [Route("api/[controller]")]
-    [ApiController]
-    [ServiceFilter(typeof(TimingFilter))]
-    [ServiceFilter(typeof(LogActionFilter))]
-    public class OrderItemsController : UniversalController<OrderItem>
+
+        private static List<Item> _items = new List<Item>
+        {
+            new Item { Id = 1, Name = "Rose Bouquet", BasePrice = 25.99m },
+            new Item { Id = 2, Name = "Tulip Arrangement", BasePrice = 19.99m },
+            new Item { Id = 3, Name = "Wedding Flowers", BasePrice = 199.99m }
+        };
+
+        // GET api/orders
+        [HttpGet]
+        public ActionResult<IEnumerable<Order>> GetAll()
+        {
+            return Ok(_data.Orders);
+        }
+        [HttpGet("with-clients")]
+        public ActionResult<IEnumerable<OrderWithClientDto>> GetAllWithClients()
+        {
+            var result = _data.Orders.Select(o => new OrderWithClientDto
+            {
+                Id = o.Id,
+                OrderDate = o.OrderDate,
+                TotalPrice = o.TotalPrice,
+                IsCurrent = o.IsCurrent,
+                Comment = o.Comment,
+                Client = _data.Clients
+                    .Where(c => c.Id == o.ClientId)
+                    .Select(c => new ClientInfoDto
+                    {
+                        Id = c.Id,
+                        Name = c.Name,
+                        DiscountLevel = c.DiscountLevel
+                    })
+                    .FirstOrDefault(),
+                Items = o.OrderItems.Select(oi => new OrderItemDto
+                {
+                    ItemId = oi.ItemId,
+                    Quantity = oi.Quantity,
+                }).ToList()
+            });
+
+            return Ok(result);
+        }
+        [HttpPost]
+        public ActionResult<OrderWithClientDto> Create([FromBody] OrderCreateDto orderDto)
+        {
+            var client = _data.Clients.FirstOrDefault(c => c.Id == orderDto.ClientId);
+            if (client == null) return BadRequest("Client not found");
+
+            var order = new Order
+            {
+                Id = _data.NextOrderId,
+                ClientId = orderDto.ClientId,
+                OrderDate = DateTime.UtcNow,
+                Comment = orderDto.Comment,
+                IsCurrent = true,
+                TotalPrice = CalculateTotal(orderDto.Items, client.DiscountLevel)
+            };
+
+            _data.Orders.Add(order);
+            client.TotalOrdersCount = _data.Orders.Count(o => o.ClientId == client.Id);
+
+            return CreatedAtAction(nameof(GetById), new { id = order.Id },
+                MapToOrderWithClientDto(order, client));
+        }
+
+        private decimal CalculateTotal(List<OrderItemDto> items, int discountLevel)
+        {
+            // Implement your pricing logic here
+            return 0;
+        }
+
+        private OrderWithClientDto MapToOrderWithClientDto(Order order, Client client)
+        {
+            return new OrderWithClientDto
+            {
+                Id = order.Id,
+                OrderDate = order.OrderDate,
+                TotalPrice = order.TotalPrice,
+                IsCurrent = order.IsCurrent,
+                Comment = order.Comment,
+                Client = new ClientInfoDto
+                {
+                    Id = client.Id,
+                    Name = client.Name,
+                    DiscountLevel = client.DiscountLevel
+                }
+            };
+        }
+
+        // GET api/orders/5
+        [HttpGet("{id}")]
+        public ActionResult<Order> GetById(int id)
+        {
+            var order = _data.Orders.FirstOrDefault(o => o.Id == id);
+            if (order == null) return NotFound();
+            return Ok(order);
+        }
+
+        // Helper method
+        private decimal CalculateOrderTotal(List<OrderItemDto> items)
+        {
+            decimal total = 0;
+            foreach (var item in items)
+            {
+                var product = _items.FirstOrDefault(p => p.Id == item.ItemId);
+                if (product != null)
+                {
+                    total += product.BasePrice * item.Quantity;
+                }
+            }
+            return total;
+        }
+    }
+
+    // Supporting DTOs
+    public class OrderCreateDto
     {
-        [HttpPost("post oderItem")]
-        [ServiceFilter(typeof(ValidateModelAttribute))]
-        [ServiceFilter(typeof(OrderItemValidationFilter))]
-        public ActionResult<OrderItem> Add([FromBody] OrderItem entity)
-        {
-            throw new NotImplementedException();
-        }
+        public int ClientId { get; set; }
+        public string Comment { get; set; }
+        public List<OrderItemDto> Items { get; set; } = new();
     }
-    [Route("api/[controller]")]
-    [ApiController]
-    [ServiceFilter(typeof(TimingFilter))]
-    [ServiceFilter(typeof(LogActionFilter))]
-    public class ItemsController : UniversalController<Item>
+
+    public class OrderItemDto
     {
-        [HttpPost("post Item")]
-        [ServiceFilter(typeof(ValidateModelAttribute))]
-        [ServiceFilter(typeof(ItemCompositionValidationFilter))]
-        public override ActionResult<Item> Add([FromBody] Item entity)
-        {
-            throw new NotImplementedException();
-        }
-
-        [HttpPatch("{id}/update-price")]
-        [ServiceFilter(typeof(PriceUpdateAuthorizationFilter))]
-        public ActionResult<Item> UpdatePrice(int id, [FromBody] decimal newPrice)
-        {
-            throw new NotImplementedException();
-        }
-    }
+        public int ItemId { get; set; }
+        public int Quantity { get; set; }
     }
 
+    [ApiController]
+    [Route("api/[controller]")]
+    public class ItemsController : ControllerBase
+    {
+        private readonly DataService _data;
+
+        public ItemsController(DataService data)
+        {
+            _data = data;
+        }
+
+        // GET api/items
+        [HttpGet]
+        public ActionResult<IEnumerable<Item>> GetAll()
+        {
+            return Ok(_data.Items);
+        }
+
+        // GET api/items/5
+        [HttpGet("{id}")]
+        public ActionResult<Item> GetById(int id)
+        {
+            var item = _data.Items.FirstOrDefault(i => i.Id == id);
+            if (item == null) return NotFound();
+            return Ok(item);
+        }
+
+        // POST api/items
+        [HttpPost]
+        public ActionResult<Item> Create([FromBody] ItemCreateDto itemDto)
+        {
+            var item = new Item
+            {
+                Id = _data.NextItemId,
+                Name = itemDto.Name,
+                BasePrice = itemDto.BasePrice
+            };
+
+            _data.Items.Add(item);
+            return CreatedAtAction(nameof(GetById), new { id = item.Id }, item);
+        }
+
+        // PUT api/items/5
+        [HttpPut("{id}")]
+        public IActionResult Update(int id, [FromBody] ItemUpdateDto itemDto)
+        {
+            var item = _data.Items.FirstOrDefault(i => i.Id == id);
+            if (item == null) return NotFound();
+
+            item.Name = itemDto.Name;
+            item.BasePrice = itemDto.BasePrice;
+
+            return NoContent();
+        }
+
+        // DELETE api/items/5
+        [HttpDelete("{id}")]
+        public IActionResult Delete(int id)
+        {
+            var item = _data.Items.FirstOrDefault(i => i.Id == id);
+            if (item == null) return NotFound();
+
+            // Check if item is used in any orders
+            if (_data.Orders.Any(o => o.OrderItems.Any(oi => oi.ItemId == id)))
+            {
+                return BadRequest("Cannot delete item referenced in existing orders");
+            }
+
+            _data.Items.Remove(item);
+            return NoContent();
+        }
+    }
+
+    // DTOs for items
+    public class ItemCreateDto
+    {
+        [Required]
+        [StringLength(100)]
+        public string Name { get; set; }
+
+        [Range(0.01, 10000)]
+        public decimal BasePrice { get; set; }
+    }
+
+    public class ItemUpdateDto
+    {
+        [StringLength(100)]
+        public string Name { get; set; }
+
+        [Range(0.01, 10000)]
+        public decimal BasePrice { get; set; }
+    }
+}
 
