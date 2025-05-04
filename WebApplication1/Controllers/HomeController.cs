@@ -243,9 +243,40 @@ namespace WebApplication1.Controllers
 
         // GET api/orders
         [HttpGet]
-        public ActionResult<IEnumerable<Order>> GetAll()
+        public ActionResult<IEnumerable<OrderResponseDto>> GetAll()
         {
-            return Ok(_data.Orders);
+            return Ok(_data.Orders.Select(order => new OrderResponseDto
+            {
+                Id = order.Id,
+                OrderDate = order.OrderDate,
+                TotalPrice = order.TotalPrice,
+                IsCurrent = order.IsCurrent,
+                Comment = order.Comment,
+                Client = _data.Clients
+                    .Where(c => c.Id == order.ClientId)
+                    .Select(c => new ClientInfoDto
+                    {
+                        Id = c.Id,
+                        Name = c.Name,
+                        DiscountLevel = c.DiscountLevel
+                    })
+                    .FirstOrDefault(),
+                Items = order.OrderItems.Select(oi => new OrderItemResponseDto
+                {
+                    Id = oi.Id,
+                    Quantity = oi.Quantity,
+                    UnitPrice = oi.UnitPrice,
+                    Item = _data.Items
+                        .Where(i => i.Id == oi.ItemId)
+                        .Select(i => new ItemDto
+                        {
+                            Id = i.Id,
+                            Name = i.Name,
+                            BasePrice = i.BasePrice
+                        })
+                        .FirstOrDefault()
+                }).ToList()
+            }));
         }
         [HttpGet("with-clients")]
         public ActionResult<IEnumerable<OrderWithClientDto>> GetAllWithClients()
@@ -276,7 +307,7 @@ namespace WebApplication1.Controllers
             return Ok(result);
         }
         [HttpPost]
-        public ActionResult<OrderWithClientDto> Create([FromBody] OrderCreateDto orderDto)
+        public ActionResult<OrderResponseDto> Create([FromBody] OrderCreateDto orderDto)
         {
             var client = _data.Clients.FirstOrDefault(c => c.Id == orderDto.ClientId);
             if (client == null) return BadRequest("Client not found");
@@ -288,14 +319,63 @@ namespace WebApplication1.Controllers
                 OrderDate = DateTime.UtcNow,
                 Comment = orderDto.Comment,
                 IsCurrent = true,
-                TotalPrice = CalculateTotal(orderDto.Items, client.DiscountLevel)
+                OrderItems = orderDto.Items.Select(i =>
+                {
+                    var item = _data.Items.FirstOrDefault(it => it.Id == i.ItemId);
+                    if (item == null)
+                        throw new ArgumentException($"Item with ID {i.ItemId} not found");
+
+                    return new OrderItem
+                    {
+                        Id = _data.NextOrderItemId,
+                        ItemId = i.ItemId,
+                        Quantity = i.Quantity,
+                        UnitPrice = item.BasePrice // Use current price
+                    };
+                }).ToList()
             };
+
+            order.TotalPrice = order.OrderItems.Sum(oi => oi.UnitPrice * oi.Quantity)
+                               * (100 - client.DiscountLevel) / 100;
 
             _data.Orders.Add(order);
             client.TotalOrdersCount = _data.Orders.Count(o => o.ClientId == client.Id);
 
             return CreatedAtAction(nameof(GetById), new { id = order.Id },
-                MapToOrderWithClientDto(order, client));
+                MapToOrderResponseDto(order, client));
+        }
+
+        private OrderResponseDto MapToOrderResponseDto(Order order, Client client)
+        {
+            return new OrderResponseDto
+            {
+                Id = order.Id,
+                OrderDate = order.OrderDate,
+                TotalPrice = order.TotalPrice,
+                IsCurrent = order.IsCurrent,
+                Comment = order.Comment,
+                Client = new ClientInfoDto
+                {
+                    Id = client.Id,
+                    Name = client.Name,
+                    DiscountLevel = client.DiscountLevel
+                },
+                Items = order.OrderItems.Select(oi => new OrderItemResponseDto
+                {
+                    Id = oi.Id,
+                    Quantity = oi.Quantity,
+                    UnitPrice = oi.UnitPrice,
+                    Item = _data.Items
+                        .Where(i => i.Id == oi.ItemId)
+                        .Select(i => new ItemDto
+                        {
+                            Id = i.Id,
+                            Name = i.Name,
+                            BasePrice = i.BasePrice
+                        })
+                        .FirstOrDefault()
+                }).ToList()
+            };
         }
 
         private decimal CalculateTotal(List<OrderItemDto> items, int discountLevel)
@@ -324,11 +404,42 @@ namespace WebApplication1.Controllers
 
         // GET api/orders/5
         [HttpGet("{id}")]
-        public ActionResult<Order> GetById(int id)
+        public ActionResult<OrderResponseDto> GetById(int id)
         {
             var order = _data.Orders.FirstOrDefault(o => o.Id == id);
             if (order == null) return NotFound();
-            return Ok(order);
+
+            var client = _data.Clients.FirstOrDefault(c => c.Id == order.ClientId);
+
+            return Ok(new OrderResponseDto
+            {
+                Id = order.Id,
+                OrderDate = order.OrderDate,
+                TotalPrice = order.TotalPrice,
+                IsCurrent = order.IsCurrent,
+                Comment = order.Comment,
+                Client = client != null ? new ClientInfoDto
+                {
+                    Id = client.Id,
+                    Name = client.Name,
+                    DiscountLevel = client.DiscountLevel
+                } : null,
+                Items = order.OrderItems.Select(oi => new OrderItemResponseDto
+                {
+                    Id = oi.Id,
+                    Quantity = oi.Quantity,
+                    UnitPrice = oi.UnitPrice,
+                    Item = _data.Items
+                        .Where(i => i.Id == oi.ItemId)
+                        .Select(i => new ItemDto
+                        {
+                            Id = i.Id,
+                            Name = i.Name,
+                            BasePrice = i.BasePrice
+                        })
+                        .FirstOrDefault()
+                }).ToList()
+            });
         }
 
         // Helper method
@@ -360,7 +471,30 @@ namespace WebApplication1.Controllers
         public int ItemId { get; set; }
         public int Quantity { get; set; }
     }
+    public class OrderItemResponseDto
+    {
+        public int Id { get; set; }
+        public int Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+        public ItemDto Item { get; set; }
+    }
 
+    public class ItemDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public decimal BasePrice { get; set; }
+    }
+    public class OrderResponseDto
+    {
+        public int Id { get; set; }
+        public DateTime OrderDate { get; set; }
+        public decimal TotalPrice { get; set; }
+        public bool IsCurrent { get; set; }
+        public string Comment { get; set; }
+        public ClientInfoDto Client { get; set; }
+        public List<OrderItemResponseDto> Items { get; set; } = new();
+    }
     [ApiController]
     [Route("api/[controller]")]
     public class ItemsController : ControllerBase
