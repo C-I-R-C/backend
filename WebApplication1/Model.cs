@@ -97,10 +97,4 @@ namespace WebApplication1
         public string Name { get; set; }
         public bool IsNatural { get; set; } 
     }
-    public record StockCheckResult(
-    bool IsAvailable,
-    int CurrentStock,
-    int MissingAmount
-);
-
 }

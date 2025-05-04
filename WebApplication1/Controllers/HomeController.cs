@@ -53,7 +53,7 @@ namespace WebApplication1.Controllers
 
             [HttpGet("most-urgent")]
             //[ServiceFilter(typeof(RoleBasedAuthFilter), Arguments = new object[] { "Manager" })]
-            public ActionResult<IEnumerable<Order>> GetMostUrgentOrders() => throw new NotImplementedException();g
+            public ActionResult<IEnumerable<Order>> GetMostUrgentOrders() => throw new NotImplementedException();
         }
     [Route("api/[controller]")]
     [ApiController]
@@ -66,8 +66,7 @@ namespace WebApplication1.Controllers
 
             [HttpGet("{flowerId}/check-stock")]
             //[ServiceFilter(typeof(CacheResponseFilter), Arguments = new object[] { "5" })] // Short cache
-            public ActionResult<StockCheckResult> CheckStock(int flowerId, [FromQuery] int requiredAmount) => throw new NotImplementedException();
-        }
+           
         [Route("api/[controller]")]
     [ApiController]
     [ServiceFilter(typeof(TimingFilter))]
@@ -104,4 +103,5 @@ namespace WebApplication1.Controllers
         }
     }
     }
+
 
