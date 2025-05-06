@@ -1,45 +1,10 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 namespace WebApplication1.Controllers
 {
-    public class ClientWithOrdersDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public string PhoneNumber { get; set; }
-        public int TotalOrdersCount { get; set; }
-        public int DiscountLevel { get; set; }
-
-        public List<OrderSummaryDto> Orders { get; set; } = new();
-    }
-
-    public class OrderSummaryDto
-    {
-        public int Id { get; set; }
-        public DateTime OrderDate { get; set; }
-        public decimal TotalPrice { get; set; }
-        public bool IsCurrent { get; set; }
-    }
-    public class OrderWithClientDto
-    {
-        public int Id { get; set; }
-        public DateTime OrderDate { get; set; }
-        public decimal TotalPrice { get; set; }
-        public bool IsCurrent { get; set; }
-        public string Comment { get; set; }
-
-        public ClientInfoDto Client { get; set; }
-        public List<OrderItemDto> Items { get; set; } = new();
-    }
-
-    public class ClientInfoDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public int DiscountLevel { get; set; }
-    }
     [ApiController]
     [Route("api/[controller]")]
     public class ClientsController : ControllerBase
@@ -50,46 +15,6 @@ namespace WebApplication1.Controllers
         {
             _data = data;
         }
-        
-        public class ClientResponseDto
-        {
-            public int Id { get; set; }
-            public string Name { get; set; }
-            public string PhoneNumber { get; set; }
-            public int TotalOrdersCount { get; set; }
-            public int DiscountLevel { get; set; }
-
-            // Optionally include summary order info
-            public decimal TotalSpent { get; set; }
-            public DateTime? LastOrderDate { get; set; }
-        }
-        public class ClientCreateDto
-        {
-            [Required]
-            [StringLength(100, MinimumLength = 2)]
-            public string Name { get; set; }
-
-            [Phone]
-            [StringLength(20)]
-            public string PhoneNumber { get; set; }
-
-            [Range(0, 100)]
-            public int DiscountLevel { get; set; } = 0;
-        }
-        public class ClientUpdateDto
-        {
-            [StringLength(100, MinimumLength = 2)]
-            public string Name { get; set; }
-
-            [Phone]
-            [StringLength(20)]
-            public string PhoneNumber { get; set; }
-
-            [Range(0, 100)]
-            public int? DiscountLevel { get; set; }
-        }
-
-        
 
         // GET api/clients
         [HttpGet]
@@ -457,44 +382,6 @@ namespace WebApplication1.Controllers
             return total;
         }
     }
-
-    // Supporting DTOs
-    public class OrderCreateDto
-    {
-        public int ClientId { get; set; }
-        public string Comment { get; set; }
-        public List<OrderItemDto> Items { get; set; } = new();
-    }
-
-    public class OrderItemDto
-    {
-        public int ItemId { get; set; }
-        public int Quantity { get; set; }
-    }
-    public class OrderItemResponseDto
-    {
-        public int Id { get; set; }
-        public int Quantity { get; set; }
-        public decimal UnitPrice { get; set; }
-        public ItemDto Item { get; set; }
-    }
-
-    public class ItemDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public decimal BasePrice { get; set; }
-    }
-    public class OrderResponseDto
-    {
-        public int Id { get; set; }
-        public DateTime OrderDate { get; set; }
-        public decimal TotalPrice { get; set; }
-        public bool IsCurrent { get; set; }
-        public string Comment { get; set; }
-        public ClientInfoDto Client { get; set; }
-        public List<OrderItemResponseDto> Items { get; set; } = new();
-    }
     [ApiController]
     [Route("api/[controller]")]
     public class ItemsController : ControllerBase
@@ -567,25 +454,545 @@ namespace WebApplication1.Controllers
             return NoContent();
         }
     }
-
-    // DTOs for items
-    public class ItemCreateDto
+    [ApiController]
+    [Route("api/orders/{orderId}/flowers")]
+    public class OrderFlowersController : ControllerBase
     {
-        [Required]
-        [StringLength(100)]
-        public string Name { get; set; }
+        private readonly DataService _data;
 
-        [Range(0.01, 10000)]
-        public decimal BasePrice { get; set; }
+        public OrderFlowersController(DataService data)
+        {
+            _data = data;
+        }
+
+        // GET api/orders/5/flowers
+        [HttpGet]
+        public ActionResult<OrderFlowersResponseDto> GetFlowersForOrder(int orderId)
+        {
+            var order = _data.Orders.FirstOrDefault(o => o.Id == orderId);
+            if (order == null) return NotFound("Order not found");
+
+            var result = new OrderFlowersResponseDto
+            {
+                OrderId = order.Id,
+                OrderDate = order.OrderDate,
+                ClientName = _data.Clients.FirstOrDefault(c => c.Id == order.ClientId)?.Name,
+                Flowers = order.OrderItems
+                    .SelectMany(oi => _data.ItemFlowers
+                        .Where(itemf => itemf.ItemId == oi.ItemId)
+                    .Select(itemf => new FlowerUsageDto
+                    {
+                        FlowerId = itemf.FlowerId,
+                        FlowerName = _data.Flowers.FirstOrDefault(f => f.Id == itemf.FlowerId)?.Name ?? "Unknown",
+                        QuantityUsed = itemf.Quantity * oi.Quantity, // Total across all items
+                        UnitCost = _data.Flowers.FirstOrDefault(f => f.Id == itemf.FlowerId)?.CostPerUnit ?? 0,
+                        Color = _data.Flowers
+                            .FirstOrDefault(f => f.Id == itemf.FlowerId)?
+                            .Color?.Name ?? "N/A",
+                        Items = new List<ItemFlowerUsageDto>
+                        {
+                            new ItemFlowerUsageDto
+                            {
+                                ItemId = oi.ItemId,
+                                ItemName = _data.Items.FirstOrDefault(i => i.Id == oi.ItemId)?.Name,
+                                QuantityInItem = itemf.Quantity,
+                                ItemQuantity = oi.Quantity
+                                }
+    }
+                    }))
+                .GroupBy(f => f.FlowerId)
+                .Select(g => new FlowerUsageDto
+                {
+                    FlowerId = g.Key,
+                    FlowerName = g.First().FlowerName,
+                    QuantityUsed = g.Sum(x => x.QuantityUsed),
+                    UnitCost = g.First().UnitCost,
+                    Color = g.First().Color,
+                    Items = g.SelectMany(x => x.Items).ToList()
+                })
+                .ToList()
+            };
+
+            return Ok(result);
+        }
+    }
+    [ApiController]
+    [Route("api/[controller]")]
+    public class FlowersController : ControllerBase
+    {
+        private readonly DataService _data;
+
+        public FlowersController(DataService data)
+        {
+            _data = data;
+        }
+
+        // GET api/flowers
+        [HttpGet]
+        public ActionResult<IEnumerable<FlowerDto>> GetAll()
+        {
+            var flowers = _data.Flowers.Select(f => new FlowerDto
+            {
+                Id = f.Id,
+                Name = f.Name,
+                InStock = f.InStock,
+                CostPerUnit = f.CostPerUnit,
+                Color = f.Color != null ? new ColorDto
+                {
+                    Id = f.Color.Id,
+                    Name = f.Color.Name,
+                    IsNatural = f.Color.IsNatural
+                } : null
+            });
+
+            return Ok(flowers);
+        }
+
+        // GET api/flowers/5
+        [HttpGet("{id}")]
+        public ActionResult<FlowerWithIngredientsDto> GetById(int id)
+        {
+            var flower = _data.Flowers.FirstOrDefault(f => f.Id == id);
+            if (flower == null) return NotFound();
+
+            return Ok(new FlowerWithIngredientsDto
+            {
+                Id = flower.Id,
+                Name = flower.Name,
+                InStock = flower.InStock,
+                CostPerUnit = flower.CostPerUnit,
+                Color = flower.Color != null ? new ColorDto
+                {
+                    Id = flower.Color.Id,
+                    Name = flower.Color.Name,
+                    IsNatural = flower.Color.IsNatural
+                } : null,
+                Ingredients = _data.FlowerIngredients
+                    .Where(fi => fi.FlowerId == id)
+                    .Select(fi => new FlowerIngredientDto
+                    {
+                        FlowerId = fi.FlowerId,
+                        IngredientId = fi.IngredientId,
+                        QuantityRequired = fi.QuantityRequired,
+                        Ingredient = _data.Ingredients
+                            .Where(i => i.Id == fi.IngredientId)
+                            .Select(i => new IngredientDto
+                            {
+                                Id = i.Id,
+                                Name = i.Name,
+                                InStock = i.InStock,
+                                CostPerUnit = i.CostPerUnit
+                            })
+                            .FirstOrDefault()
+                    })
+                    .ToList()
+            });
+        }
+
+        // POST api/flowers
+        [HttpPost]
+        public ActionResult<FlowerDto> Create([FromBody] FlowerCreateDto flowerDto)
+        {
+            var flower = new Flower
+            {
+                Id = _data.NextFlowerId,
+                Name = flowerDto.Name,
+                InStock = flowerDto.InStock,
+                CostPerUnit = flowerDto.CostPerUnit,
+                ColorId = flowerDto.ColorId
+            };
+
+            _data.Flowers.Add(flower);
+            return CreatedAtAction(nameof(GetById), new { id = flower.Id },
+                new FlowerDto
+                {
+                    Id = flower.Id,
+                    Name = flower.Name,
+                    InStock = flower.InStock,
+                    CostPerUnit = flower.CostPerUnit
+                });
+        }
+
+        // PUT api/flowers/5
+        [HttpPut("{id}")]
+        public IActionResult Update(int id, [FromBody] FlowerUpdateDto flowerDto)
+        {
+            var flower = _data.Flowers.FirstOrDefault(f => f.Id == id);
+            if (flower == null) return NotFound();
+
+            flower.Name = flowerDto.Name;
+            flower.InStock = flowerDto.InStock;
+            flower.CostPerUnit = flowerDto.CostPerUnit;
+            flower.ColorId = flowerDto.ColorId;
+
+            return NoContent();
+        }
+
+        // DELETE api/flowers/5
+        [HttpDelete("{id}")]
+        public IActionResult Delete(int id)
+        {
+            var flower = _data.Flowers.FirstOrDefault(f => f.Id == id);
+            if (flower == null) return NotFound();
+
+            // Check if flower is used in any items
+            if (_data.ItemFlowers.Any(itemf => itemf.FlowerId == id))
+        {
+                return BadRequest("Cannot delete flower used in items");
+            }
+
+            _data.Flowers.Remove(flower);
+            return NoContent();
+        }
     }
 
-    public class ItemUpdateDto
+    [ApiController]
+    [Route("api/orders/{orderId}/items/{itemId}/flowers")]
+    public class OrderItemFlowersController : ControllerBase
     {
-        [StringLength(100)]
-        public string Name { get; set; }
+        private readonly DataService _data;
 
-        [Range(0.01, 10000)]
-        public decimal BasePrice { get; set; }
+        public OrderItemFlowersController(DataService data)
+        {
+            _data = data;
+        }
+
+        // GET api/orders/5/items/1/flowers
+        [HttpGet]
+        public ActionResult<OrderItemFlowersResponseDto> GetFlowersForOrderItem(
+            int orderId, int itemId)
+        {
+            var order = _data.Orders.FirstOrDefault(o => o.Id == orderId);
+            if (order == null) return NotFound("Order not found");
+
+            var orderItem = order.OrderItems.FirstOrDefault(oi => oi.ItemId == itemId);
+            if (orderItem == null) return NotFound("Item not found in order");
+
+            var item = _data.Items.FirstOrDefault(i => i.Id == itemId);
+            if (item == null) return NotFound("Item not found");
+
+            var result = new OrderItemFlowersResponseDto
+            {
+                OrderId = order.Id,
+                ItemId = item.Id,
+                ItemName = item.Name,
+                ItemQuantity = orderItem.Quantity,
+                Flowers = _data.ItemFlowers
+                    .Where(itemf => itemf.ItemId == itemId)
+                .Select(itemf => new FlowerDetailDto
+                {
+                    FlowerId = itemf.FlowerId,
+                    FlowerName = _data.Flowers.FirstOrDefault(f => f.Id == itemf.FlowerId)?.Name ?? "Unknown",
+                    QuantityPerItem = itemf.Quantity,
+                    TotalQuantity = itemf.Quantity * orderItem.Quantity,
+                    UnitCost = _data.Flowers.FirstOrDefault(f => f.Id == itemf.FlowerId)?.CostPerUnit ?? 0,
+                    Color = _data.Flowers
+                        .FirstOrDefault(f => f.Id == itemf.FlowerId)?
+                        .Color?.Name ?? "N/A"
+                })
+                .ToList()
+            };
+
+            return Ok(result);
+        }
+    }
+        [ApiController]
+        [Route("api/[controller]")]
+        public class ColorsController : ControllerBase
+        {
+            private readonly DataService _data;
+
+            public ColorsController(DataService data)
+            {
+                _data = data;
+            }
+
+            // GET api/colors
+            [HttpGet]
+            public ActionResult<IEnumerable<ColorDto>> GetAll()
+            {
+                var colors = _data.Colors.Select(c => new ColorDto
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    IsNatural = c.IsNatural
+                });
+
+                return Ok(colors);
+            }
+
+            // GET api/colors/5
+            [HttpGet("{id}")]
+            public ActionResult<ColorDto> GetById(int id)
+            {
+                var color = _data.Colors.FirstOrDefault(c => c.Id == id);
+                if (color == null) return NotFound();
+
+                return Ok(new ColorDto
+                {
+                    Id = color.Id,
+                    Name = color.Name,
+                    IsNatural = color.IsNatural
+                });
+            }
+
+            // POST api/colors
+            [HttpPost]
+            public ActionResult<ColorDto> Create([FromBody] ColorCreateDto colorDto)
+            {
+                var color = new Color
+                {
+                    Id = _data.NextColorId,
+                    Name = colorDto.Name,
+                    IsNatural = colorDto.IsNatural
+                };
+
+                _data.Colors.Add(color);
+
+                return CreatedAtAction(nameof(GetById), new { id = color.Id },
+                    new ColorDto
+                    {
+                        Id = color.Id,
+                        Name = color.Name,
+                        IsNatural = color.IsNatural
+                    });
+            }
+
+            // PUT api/colors/5
+            [HttpPut("{id}")]
+            public IActionResult Update(int id, [FromBody] ColorUpdateDto colorDto)
+            {
+                var color = _data.Colors.FirstOrDefault(c => c.Id == id);
+                if (color == null) return NotFound();
+
+                if (!string.IsNullOrEmpty(colorDto.Name))
+                    color.Name = colorDto.Name;
+
+                if (colorDto.IsNatural.HasValue)
+                    color.IsNatural = colorDto.IsNatural.Value;
+
+                return NoContent();
+            }
+
+            // DELETE api/colors/5
+            [HttpDelete("{id}")]
+            public IActionResult Delete(int id)
+            {
+                var color = _data.Colors.FirstOrDefault(c => c.Id == id);
+                if (color == null) return NotFound();
+
+                // Check if color is used by any flowers
+                if (_data.Flowers.Any(f => f.ColorId == id))
+                {
+                    return BadRequest("Cannot delete color assigned to flowers");
+                }
+
+                _data.Colors.Remove(color);
+                return NoContent();
+            }
+        }
+    [ApiController]
+    [Route("api/[controller]")]
+    public class IngredientsController : ControllerBase
+    {
+        private readonly DataService _data;
+
+        public IngredientsController(DataService data)
+        {
+            _data = data;
+        }
+
+        // GET api/ingredients
+        [HttpGet]
+        public ActionResult<IEnumerable<IngredientDto>> GetAll()
+        {
+            return Ok(_data.Ingredients.Select(i => new IngredientDto
+            {
+                Id = i.Id,
+                Name = i.Name,
+                InStock = i.InStock,
+                CostPerUnit = i.CostPerUnit
+            }));
+        }
+
+        // GET api/ingredients/5
+        [HttpGet("{id}")]
+        public ActionResult<IngredientDto> GetById(int id)
+        {
+            var ingredient = _data.Ingredients.FirstOrDefault(i => i.Id == id);
+            if (ingredient == null) return NotFound();
+
+            return Ok(new IngredientDto
+            {
+                Id = ingredient.Id,
+                Name = ingredient.Name,
+                InStock = ingredient.InStock,
+                CostPerUnit = ingredient.CostPerUnit
+            });
+        }
+
+        // POST api/ingredients
+        [HttpPost]
+        public ActionResult<IngredientDto> Create([FromBody] IngredientCreateDto dto)
+        {
+            var ingredient = new Ingredient
+            {
+                Id = _data.NextIngredientId,
+                Name = dto.Name,
+                InStock = dto.InStock,
+                CostPerUnit = dto.CostPerUnit
+            };
+
+            _data.Ingredients.Add(ingredient);
+            return CreatedAtAction(nameof(GetById), new { id = ingredient.Id },
+                new IngredientDto
+                {
+                    Id = ingredient.Id,
+                    Name = ingredient.Name,
+                    InStock = ingredient.InStock,
+                    CostPerUnit = ingredient.CostPerUnit
+                });
+        }
+
+        // PUT api/ingredients/5
+        [HttpPut("{id}")]
+        public IActionResult Update(int id, [FromBody] IngredientCreateDto dto)
+        {
+            var ingredient = _data.Ingredients.FirstOrDefault(i => i.Id == id);
+            if (ingredient == null) return NotFound();
+
+            ingredient.Name = dto.Name;
+            ingredient.InStock = dto.InStock;
+            ingredient.CostPerUnit = dto.CostPerUnit;
+
+            return NoContent();
+        }
+
+        // DELETE api/ingredients/5
+        [HttpDelete("{id}")]
+        public IActionResult Delete(int id)
+        {
+            var ingredient = _data.Ingredients.FirstOrDefault(i => i.Id == id);
+            if (ingredient == null) return NotFound();
+
+            if (_data.FlowerIngredients.Any(fi => fi.IngredientId == id))
+            {
+                return BadRequest("Cannot delete ingredient used in flower recipes");
+            }
+
+            _data.Ingredients.Remove(ingredient);
+            return NoContent();
+        }
+    }
+    [ApiController]
+    [Route("api/flowers/{flowerId}/ingredients")]
+    public class FlowerIngredientsController : ControllerBase
+    {
+        private readonly DataService _data;
+
+        public FlowerIngredientsController(DataService data)
+        {
+            _data = data;
+        }
+
+        // GET api/flowers/1/ingredients
+        [HttpGet]
+        public ActionResult<IEnumerable<FlowerIngredientDto>> GetIngredientsForFlower(int flowerId)
+        {
+            if (!_data.Flowers.Any(f => f.Id == flowerId))
+                return NotFound("Flower not found");
+
+            return Ok(_data.FlowerIngredients
+                .Where(fi => fi.FlowerId == flowerId)
+                .Select(fi => new FlowerIngredientDto
+                {
+                    FlowerId = fi.FlowerId,
+                    IngredientId = fi.IngredientId,
+                    QuantityRequired = fi.QuantityRequired,
+                    Ingredient = _data.Ingredients
+                        .Where(i => i.Id == fi.IngredientId)
+                        .Select(i => new IngredientDto
+                        {
+                            Id = i.Id,
+                            Name = i.Name,
+                            InStock = i.InStock,
+                            CostPerUnit = i.CostPerUnit
+                        })
+                        .FirstOrDefault()
+                }));
+        }
+
+        // POST api/flowers/1/ingredients
+        [HttpPost]
+        public ActionResult<FlowerIngredientDto> AddIngredientToFlower(
+            int flowerId, [FromBody] AddIngredientToFlowerDto dto)
+        {
+            if (!_data.Flowers.Any(f => f.Id == flowerId))
+                return NotFound("Flower not found");
+
+            if (!_data.Ingredients.Any(i => i.Id == dto.IngredientId))
+                return NotFound("Ingredient not found");
+
+            var existing = _data.FlowerIngredients
+                .FirstOrDefault(fi => fi.FlowerId == flowerId && fi.IngredientId == dto.IngredientId);
+
+            if (existing != null)
+            {
+                existing.QuantityRequired = dto.QuantityRequired;
+            }
+            else
+            {
+                _data.FlowerIngredients.Add(new FlowerIngredient
+                {
+                    FlowerId = flowerId,
+                    IngredientId = dto.IngredientId,
+                    QuantityRequired = dto.QuantityRequired
+                });
+            }
+
+            var ingredient = _data.Ingredients.First(i => i.Id == dto.IngredientId);
+            return CreatedAtAction(
+                nameof(GetIngredientsForFlower),
+                new { flowerId },
+                new FlowerIngredientDto
+                {
+                    FlowerId = flowerId,
+                    IngredientId = dto.IngredientId,
+                    QuantityRequired = dto.QuantityRequired,
+                    Ingredient = new IngredientDto
+                    {
+                        Id = ingredient.Id,
+                        Name = ingredient.Name,
+                        InStock = ingredient.InStock,
+                        CostPerUnit = ingredient.CostPerUnit
+                    }
+                });
+        }
+
+        // DELETE api/flowers/1/ingredients/2
+        [HttpDelete("{ingredientId}")]
+        public IActionResult RemoveIngredientFromFlower(int flowerId, int ingredientId)
+        {
+            var flowerIngredient = _data.FlowerIngredients
+                .FirstOrDefault(fi => fi.FlowerId == flowerId && fi.IngredientId == ingredientId);
+
+            if (flowerIngredient == null)
+                return NotFound("Ingredient not found in this flower recipe");
+
+            _data.FlowerIngredients.Remove(flowerIngredient);
+            return NoContent();
+        }
+    }
+
+    // Supporting DTOs
+    public class AddIngredientToFlowerDto
+    {
+        [Range(1, int.MaxValue)]
+        public int IngredientId { get; set; }
+
+        [Range(1, 100)]
+        public int QuantityRequired { get; set; }
     }
 }
+
 

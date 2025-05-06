@@ -165,6 +165,46 @@ namespace WebApplication1
             ? Orders.SelectMany(o => o.OrderItems).Max(oi => oi.Id)
             : 1;
         public int NextItemId => Items.Any() ? Items.Max(i => i.Id) + 1 : 1;
+        public List<ItemFlower> ItemFlowers { get; set; } = new()
+    {
+        // Sample data showing items and their flower components
+        new ItemFlower { ItemId = 1, FlowerId = 1, Quantity = 12 }, // 12 red roses in bouquet
+        new ItemFlower { ItemId = 1, FlowerId = 3, Quantity = 5 },  // 5 lavender sprigs
+        new ItemFlower { ItemId = 2, FlowerId = 2, Quantity = 10 }   // 10 white tulips
+    };
+        public List<Flower> Flowers { get; set; } = new()
+{
+    new Flower { Id = 1, Name = "Red Rose", InStock = 100, CostPerUnit = 1.50m },
+    new Flower { Id = 2, Name = "White Tulip", InStock = 75, CostPerUnit = 1.20m },
+    new Flower { Id = 3, Name = "Lavender", InStock = 50, CostPerUnit = 0.80m }
+};
 
+        public List<Color> Colors { get; set; } = new()
+{
+    new Color { Id = 1, Name = "Red", IsNatural = true },
+    new Color { Id = 2, Name = "White", IsNatural = true },
+    new Color { Id = 3, Name = "Purple", IsNatural = true }
+};
+
+        public int NextFlowerId => Flowers.Any() ? Flowers.Max(f => f.Id) + 1 : 1;
+        public int NextColorId => Colors.Any() ? Colors.Max(c => c.Id) + 1 : 1;
+        public List<Ingredient> Ingredients { get; set; } = new()
+    {
+        new Ingredient { Id = 1, Name = "Zephyr Silk", InStock = 100, CostPerUnit = 2.50m },
+        new Ingredient { Id = 2, Name = "Luminous Thread", InStock = 75, CostPerUnit = 1.80m },
+        new Ingredient { Id = 3, Name = "Ethereal Dye", InStock = 50, CostPerUnit = 3.20m }
+    };
+
+        public List<FlowerIngredient> FlowerIngredients { get; set; } = new()
+    {
+        // Red Rose requires Zephyr Silk and Ethereal Dye
+        new FlowerIngredient { FlowerId = 1, IngredientId = 1, QuantityRequired = 2 },
+        new FlowerIngredient { FlowerId = 1, IngredientId = 3, QuantityRequired = 1 },
+        
+        // White Tulip requires Luminous Thread
+        new FlowerIngredient { FlowerId = 2, IngredientId = 2, QuantityRequired = 3 }
+    };
+
+        public int NextIngredientId => Ingredients.Any() ? Ingredients.Max(i => i.Id) + 1 : 1;
     }
 }
