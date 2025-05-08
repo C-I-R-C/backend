@@ -17,7 +17,7 @@ namespace WebApplication1
         public int Id { get; set; }
         public int ClientId { get; set; }
         public Client Client { get; set; }
-        public DateTime OrderDate { get; set; } = DateTime.UtcNow;
+        public DateTime OrderDate { get; set; } = DateTime.Now;
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
         public string Comment { get; set; }
         public decimal TotalPrice { get; set; } 
@@ -70,7 +70,7 @@ namespace WebApplication1
     {
         public int Id { get; set; }
         public string Name { get; set; }
-        public int inStock { get; set; }
+        public int InStock { get; set; }
 
     }
     public class Ingredient
@@ -97,6 +97,9 @@ namespace WebApplication1
         public string Name { get; set; }
         public bool IsNatural { get; set; } 
     }
+
+
+
     public class DataService
     {
         public List<Client> Clients { get; } = new()
@@ -206,5 +209,12 @@ namespace WebApplication1
     };
 
         public int NextIngredientId => Ingredients.Any() ? Ingredients.Max(i => i.Id) + 1 : 1;
+        public List<Box> Boxes { get; set; } = new()
+    {
+        new Box { Id = 1, Name = "Standard Box", InStock = 50 },
+        new Box { Id = 2, Name = "Deluxe Box", InStock = 20 }
+    };
+
+        public int NextBoxId => Boxes.Any() ? Boxes.Max(b => b.Id) + 1 : 1;
     }
 }

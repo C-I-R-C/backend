@@ -103,16 +103,16 @@ namespace WebApplication1
         public string Name { get; set; }
         public decimal BasePrice { get; set; }
     }
-    public class OrderResponseDto
-    {
-        public int Id { get; set; }
-        public DateTime OrderDate { get; set; }
-        public decimal TotalPrice { get; set; }
-        public bool IsCurrent { get; set; }
-        public string Comment { get; set; }
-        public ClientInfoDto Client { get; set; }
-        public List<OrderItemResponseDto> Items { get; set; } = new();
-    }
+    //public class OrderResponseDto
+    //{
+    //    public int Id { get; set; }
+    //    public DateTime OrderDate { get; set; }
+    //    public decimal TotalPrice { get; set; }
+    //    public bool IsCurrent { get; set; }
+    //    public string Comment { get; set; }
+    //    public ClientInfoDto Client { get; set; }
+    //    public List<OrderItemResponseDto> Items { get; set; } = new();
+    //}
     public class ItemCreateDto
     {
         [Required]
@@ -165,15 +165,15 @@ namespace WebApplication1
         public List<FlowerDetailDto> Flowers { get; set; } = new();
     }
 
-    public class FlowerDetailDto
-    {
-        public int FlowerId { get; set; }
-        public string FlowerName { get; set; }
-        public int QuantityPerItem { get; set; }
-        public int TotalQuantity { get; set; }
-        public decimal UnitCost { get; set; }
-        public string Color { get; set; }
-    }
+    //public class FlowerDetailDto
+    //{
+    //    public int FlowerId { get; set; }
+    //    public string FlowerName { get; set; }
+    //    public int QuantityPerItem { get; set; }
+    //    public int TotalQuantity { get; set; }
+    //    public decimal UnitCost { get; set; }
+    //    public string Color { get; set; }
+    //}
     public class FlowerCreateDto
     {
         [Required]
@@ -284,5 +284,111 @@ namespace WebApplication1
         public decimal CostPerUnit { get; set; }
         public ColorDto Color { get; set; }
         public List<FlowerIngredientDto> Ingredients { get; set; } = new();
+    }
+
+    public class OrderUpdateDto
+    {
+        public string Comment { get; set; }
+        public bool? IsCurrent { get; set; }
+    }
+
+
+    //public class OrderItemWithDetailsDto
+    //{
+    //    public int Id { get; set; }
+    //    public int Quantity { get; set; }
+    //    public decimal UnitPrice { get; set; }
+    //    public ItemDto Item { get; set; }
+    //    public List<FlowerDetailDto> Flowers { get; set; } = new();
+    //}
+    //public class OrderCreateDto
+    //{
+    //    [Required]
+    //    [Range(1, int.MaxValue)]
+    //    public int ClientId { get; set; }
+
+    //    public string Comment { get; set; }
+
+    //    [Required]
+    //    [MinLength(1)]
+    //    public List<OrderItemCreateDto> Items { get; set; } = new();
+    //}
+
+    //public class OrderUpdateDto
+    //{
+    //    public string Comment { get; set; }
+    //    public bool? IsCurrent { get; set; }
+    //}
+
+    public class OrderResponseDto
+    {
+        public int Id { get; set; }
+        public DateTime OrderDate { get; set; }
+        public decimal TotalPrice { get; set; }
+        public bool IsCurrent { get; set; }
+        public string Comment { get; set; }
+        public ClientInfoDto Client { get; set; }
+        public List<OrderItemWithDetailsDto> Items { get; set; } = new();
+    }
+
+    public class OrderItemWithDetailsDto
+    {
+        public int Id { get; set; }
+        public int Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+        public ItemDto Item { get; set; }
+        public List<FlowerDetailDto> Flowers { get; set; } = new();
+    }
+
+    public class FlowerDetailDto
+    {
+        public int FlowerId { get; set; }
+        public string FlowerName { get; set; }
+        public int QuantityPerItem { get; set; }
+        public int TotalQuantity { get; set; }
+        public decimal UnitCost { get; set; }
+        public string Color { get; set; }
+        public List<IngredientDto> Ingredients { get; set; } = new();
+    }
+    public class AddFlowerToItemDto
+    {
+        [Range(1, int.MaxValue)]
+        public int FlowerId { get; set; }
+
+        [Range(1, 100)]
+        public int Quantity { get; set; }
+    }
+
+    public class UpdateFlowerQuantityDto
+    {
+        [Range(1, 100)]
+        public int Quantity { get; set; }
+    }
+    public class BoxDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public int InStock { get; set; }
+    }
+
+    // Dtos/BoxCreateDto.cs
+    public class BoxCreateDto
+    {
+        [Required(ErrorMessage = "Box name is required")]
+        [StringLength(100, ErrorMessage = "Name cannot exceed 100 characters")]
+        public string Name { get; set; }
+
+        [Range(0, int.MaxValue, ErrorMessage = "Stock cannot be negative")]
+        public int InStock { get; set; } = 0;
+    }
+
+    // Dtos/BoxUpdateDto.cs
+    public class BoxUpdateDto
+    {
+        [StringLength(100, ErrorMessage = "Name cannot exceed 100 characters")]
+        public string Name { get; set; }
+
+        [Range(0, int.MaxValue, ErrorMessage = "Stock cannot be negative")]
+        public int? InStock { get; set; }
     }
 }
