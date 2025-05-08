@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
-using WebApplication1;
+using WebApplication1.Models;
 namespace WebApplication1.Controllers
 {
     [ApiController]

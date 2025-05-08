@@ -1,6 +1,6 @@
 ﻿using System.Drawing;
 
-namespace WebApplication1
+namespace WebApplication1.Models
 {
     public class Client
     {

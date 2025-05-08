@@ -1,10 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using WebApplication1.Models;
 
 namespace WebApplication1.Controllers
 {
         [ApiController]
         [Route("api/[controller]")]
-        public class OrdersController : ControllerBase
+    [Authorize]
+    public class OrdersController : ControllerBase
         {
             private readonly DataService _data;
 
