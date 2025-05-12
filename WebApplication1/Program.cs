@@ -30,6 +30,16 @@ builder.Services.AddScoped<ETagFilter>();
 builder.Services.AddScoped<CacheResponseFilter>();
 builder.Services.AddSingleton<DataService>();
 
+builder.Services.AddCors(option =>
+{
+    option.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:3000");
+        policy.AllowAnyHeader();
+        policy.AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
 
 // ¬ключаем Swagger всегда (не только в Development)
@@ -42,7 +52,10 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseRouting();
+app.UseCors();
 app.MapControllers();
+
+
 
 //app.MapGet("/", (ApplicationDbContext db) => db.Clients.ToList());
 app.MapGet("/", () => Results.Redirect("/swagger"));
