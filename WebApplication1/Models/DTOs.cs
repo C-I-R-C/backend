@@ -14,6 +14,35 @@ namespace WebApplication1
 
         public List<OrderSummaryDto> Orders { get; set; } = new();
     }
+    public class ClientResponseDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string PhoneNumber { get; set; }
+        public int TotalOrdersCount { get; set; }
+        public int DiscountLevel { get; set; }
+        public decimal TotalSpent { get; set; }
+        public DateTime? LastOrderDate { get; set; }
+    }
+
+    public class ClientCreateDto
+    {
+        [Required]
+        public string Name { get; set; }
+
+        [Required]
+        public string PhoneNumber { get; set; }
+
+        public int DiscountLevel { get; set; } = 0;
+    }
+
+    public class ClientUpdateDto
+    {
+        public string? Name { get; set; }
+        public string? PhoneNumber { get; set; }
+        public int? DiscountLevel { get; set; }
+    }
+
 
     public class OrderSummaryDto
     {
@@ -39,43 +68,6 @@ namespace WebApplication1
         public int Id { get; set; }
         public string Name { get; set; }
         public int DiscountLevel { get; set; }
-    }
-    public class ClientResponseDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public string PhoneNumber { get; set; }
-        public int TotalOrdersCount { get; set; }
-        public int DiscountLevel { get; set; }
-
-        // Optionally include summary order info
-        public decimal TotalSpent { get; set; }
-        public DateTime? LastOrderDate { get; set; }
-    }
-    public class ClientCreateDto
-    {
-        [Required]
-        [StringLength(100, MinimumLength = 2)]
-        public string Name { get; set; }
-
-        [Phone]
-        [StringLength(20)]
-        public string PhoneNumber { get; set; }
-
-        [Range(0, 100)]
-        public int DiscountLevel { get; set; } = 0;
-    }
-    public class ClientUpdateDto
-    {
-        [StringLength(100, MinimumLength = 2)]
-        public string Name { get; set; }
-
-        [Phone]
-        [StringLength(20)]
-        public string PhoneNumber { get; set; }
-
-        [Range(0, 100)]
-        public int? DiscountLevel { get; set; }
     }
     public class OrderCreateDto
     {
@@ -246,13 +238,13 @@ namespace WebApplication1
 
         public bool? IsNatural { get; set; }
     }
-    public class IngredientDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-        public int InStock { get; set; }
-        public decimal CostPerUnit { get; set; }
-    }
+    //public class IngredientDto
+    //{
+    //    public int Id { get; set; }
+    //    public string Name { get; set; }
+    //    public int InStock { get; set; }
+    //    public decimal CostPerUnit { get; set; }
+    //}
 
     // Dtos/IngredientCreateDto.cs
     public class IngredientCreateDto
@@ -390,5 +382,61 @@ namespace WebApplication1
 
         [Range(0, int.MaxValue, ErrorMessage = "Stock cannot be negative")]
         public int? InStock { get; set; }
+    }
+  
+
+    public class OrderItemCreateDto
+    {
+        public int ItemId { get; set; }
+        public int Quantity { get; set; }
+    }
+
+
+    public class IngredientDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public int InStock { get; set; }
+        public decimal CostPerUnit { get; set; }
+    }
+    public class ItemResponseDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public decimal BasePrice { get; set; }
+
+        // Box information (if exists)
+        public BoxDto Box { get; set; }
+
+        // Flowers used in this item
+        public List<ItemFlowerDetailDto> Flowers { get; set; } = new();
+
+        // Calculated total cost based on components
+        public decimal ProductionCost { get; set; }
+    }
+
+    //public class BoxDto
+    //{
+    //    public int Id { get; set; }
+    //    public string Name { get; set; }
+    //    public int InStock { get; set; }
+    //}
+
+    public class ItemFlowerDetailDto
+    {
+        public int FlowerId { get; set; }
+        public string FlowerName { get; set; }
+        public int Quantity { get; set; }
+        public decimal UnitCost { get; set; }
+        public string Color { get; set; }
+        public List<FlowerIngredient1Dto> Ingredients { get; set; } = new();
+    }
+
+    public class FlowerIngredient1Dto
+    {
+        public int IngredientId { get; set; }
+        public string Name { get; set; }
+        public int QuantityRequired { get; set; }
+        public decimal CostPerUnit { get; set; }
     }
 }

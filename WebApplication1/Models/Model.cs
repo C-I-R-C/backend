@@ -17,7 +17,7 @@ namespace WebApplication1.Models
         public int Id { get; set; }
         public int ClientId { get; set; }
         public Client Client { get; set; }
-        public DateTime OrderDate { get; set; } = DateTime.Now;
+        public DateTime OrderDate { get; set; } = DateTime.UtcNow;
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
         public string Comment { get; set; }
         public decimal TotalPrice { get; set; } 

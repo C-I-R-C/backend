@@ -1,20 +1,25 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
-using System.Text;
+using Microsoft.EntityFrameworkCore;
 using WebApplication1;
 using WebApplication1.Models;
-using WebApplication1.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Конфигурация базы данных
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Конфигурация контроллеров
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
+// Настройка Swagger
+
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-// Register filter services
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new() { Title = "darizefir_API", Version = "v1" });
+});
+
+// Регистрация фильтров (ваши кастомные фильтры)
 builder.Services.AddScoped<ValidateModelAttribute>();
 builder.Services.AddScoped<LogActionFilter>();
 builder.Services.AddScoped<ConcurrencyCheckFilter>();
@@ -24,64 +29,21 @@ builder.Services.AddScoped<OrderPriorityFilter>();
 builder.Services.AddScoped<ETagFilter>();
 builder.Services.AddScoped<CacheResponseFilter>();
 builder.Services.AddSingleton<DataService>();
-builder.Services.AddScoped<TokenService>();
-// Register with parameters
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
-        };
-    });
-builder.Services.AddSwaggerGen(c =>
-{
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "JWT Authorization header using the Bearer scheme",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
 
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            new string[] {}
-        }
-    });
-});
-builder.Services.AddAuthorization();
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Включаем Swagger всегда (не только в Development)
+
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-app.UseAuthentication();
-app.UseAuthorization();
-app.UseHttpsRedirection();
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Flower Shop API V1");
+    c.RoutePrefix = "swagger"; // Явно задаем маршрут
+});
 
-app.UseAuthorization();
-
+app.UseRouting();
 app.MapControllers();
 
+//app.MapGet("/", (ApplicationDbContext db) => db.Clients.ToList());
+app.MapGet("/", () => Results.Redirect("/swagger"));
 app.Run();

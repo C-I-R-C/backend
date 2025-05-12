@@ -1,24 +1,29 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using WebApplication1;
 using WebApplication1.Models;
 
 namespace WebApplication1.Controllers
 {
+    [Route("api/[controller]")]
     [ApiController]
-    [Route("api/items/{itemId}/flowers")]
-    public class ItemFlowersController : ControllerBase
+    public class ItemFlowers1Controller : ControllerBase
     {
-        private readonly DataService _data;
+        private readonly ApplicationDbContext _data;
 
-        public ItemFlowersController(DataService data)
+        public ItemFlowers1Controller(ApplicationDbContext context)
         {
-            _data = data;
+            _data = context;
         }
 
         // GET api/items/5/flowers
         [HttpGet]
-        public ActionResult<IEnumerable<ItemFlowerDto>> GetFlowersForItem(int itemId)
+        public async Task <ActionResult<IEnumerable<ItemFlowerDto>>> GetFlowersForItem(int itemId)
         {
             if (!_data.Items.Any(i => i.Id == itemId))
                 return NotFound("Item not found");
@@ -46,14 +51,14 @@ namespace WebApplication1.Controllers
                         } : null
                     })
                     .FirstOrDefault()
-                });
+            });
 
-        return Ok(itemFlowers);
-    }
+            return Ok(itemFlowers);
+        }
 
-    // POST api/items/5/flowers
-    [HttpPost]
-        public ActionResult<ItemFlowerDto> AddFlowerToItem(int itemId, [FromBody] AddFlowerToItemDto dto)
+        // POST api/items/5/flowers
+        [HttpPost]
+        public async Task <ActionResult<ItemFlowerDto>> AddFlowerToItem(int itemId, [FromBody] AddFlowerToItemDto dto)
         {
             if (!_data.Items.Any(i => i.Id == itemId))
                 return NotFound("Item not found");
@@ -62,7 +67,7 @@ namespace WebApplication1.Controllers
                 return NotFound("Flower not found");
 
             var existing = _data.ItemFlowers
-                .FirstOrDefault(itemf => itemf.ItemId == itemId && itemf.FlowerId == dto.FlowerId) ;
+                .FirstOrDefault(itemf => itemf.ItemId == itemId && itemf.FlowerId == dto.FlowerId);
 
             if (existing != null)
             {
@@ -76,9 +81,17 @@ namespace WebApplication1.Controllers
                     FlowerId = dto.FlowerId,
                     Quantity = dto.Quantity
                 });
+                //_data.Items.First(i => i.Id == itemId).ItemFlowers.Add(new ItemFlower
+                //{
+                //    ItemId = itemId,
+                //    FlowerId = dto.FlowerId,
+                //    Quantity = dto.Quantity
+                //});
             }
 
             var flower = _data.Flowers.First(f => f.Id == dto.FlowerId);
+
+            await _data.SaveChangesAsync();
             return CreatedAtAction(
                 nameof(GetFlowersForItem),
                 new { itemId },
@@ -108,7 +121,7 @@ namespace WebApplication1.Controllers
         public IActionResult UpdateFlowerQuantity(int itemId, int flowerId, [FromBody] UpdateFlowerQuantityDto dto)
         {
             var itemFlower = _data.ItemFlowers
-                .FirstOrDefault(itemf => itemf.ItemId == itemId && itemf.FlowerId == flowerId) ;
+                .FirstOrDefault(itemf => itemf.ItemId == itemId && itemf.FlowerId == flowerId);
 
             if (itemFlower == null)
                 return NotFound("Flower not found in this item");
@@ -122,7 +135,7 @@ namespace WebApplication1.Controllers
         public IActionResult RemoveFlowerFromItem(int itemId, int flowerId)
         {
             var itemFlower = _data.ItemFlowers
-                .FirstOrDefault(itemf => itemf.ItemId == itemId && itemf.FlowerId == flowerId) ;
+                .FirstOrDefault(itemf => itemf.ItemId == itemId && itemf.FlowerId == flowerId);
 
             if (itemFlower == null)
                 return NotFound("Flower not found in this item");
@@ -131,6 +144,4 @@ namespace WebApplication1.Controllers
             return NoContent();
         }
     }
-
-// Supporting DTOs
 }

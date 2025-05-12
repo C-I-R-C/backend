@@ -1,4 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
+using WebApplication1;
 using WebApplication1.Models;
 
 namespace WebApplication1.Controllers
@@ -7,16 +14,16 @@ namespace WebApplication1.Controllers
     [Route("api/[controller]")]
     public class FlowersController : ControllerBase
     {
-        private readonly DataService _data;
+        private readonly ApplicationDbContext _data;
 
-        public FlowersController(DataService data)
+        public FlowersController(ApplicationDbContext context)
         {
-            _data = data;
+            _data = context;
         }
 
         // GET api/flowers
         [HttpGet]
-        public ActionResult<IEnumerable<FlowerDto>> GetAll()
+        public async Task <ActionResult<IEnumerable<FlowerDto>>> GetAll()
         {
             var flowers = _data.Flowers.Select(f => new FlowerDto
             {
@@ -37,7 +44,7 @@ namespace WebApplication1.Controllers
 
         // GET api/flowers/5
         [HttpGet("{id}")]
-        public ActionResult<FlowerWithIngredientsDto> GetById(int id)
+        public async  Task <ActionResult<FlowerWithIngredientsDto>> GetById(int id)
         {
             var flower = _data.Flowers.FirstOrDefault(f => f.Id == id);
             if (flower == null) return NotFound();
@@ -78,11 +85,10 @@ namespace WebApplication1.Controllers
 
         // POST api/flowers
         [HttpPost]
-        public ActionResult<FlowerDto> Create([FromBody] FlowerCreateDto flowerDto)
+        public async Task <ActionResult<FlowerDto>> Create([FromBody] FlowerCreateDto flowerDto)
         {
             var flower = new Flower
             {
-                Id = _data.NextFlowerId,
                 Name = flowerDto.Name,
                 InStock = flowerDto.InStock,
                 CostPerUnit = flowerDto.CostPerUnit,
@@ -90,6 +96,7 @@ namespace WebApplication1.Controllers
             };
 
             _data.Flowers.Add(flower);
+            await _data.SaveChangesAsync();
             return CreatedAtAction(nameof(GetById), new { id = flower.Id },
                 new FlowerDto
                 {
@@ -102,7 +109,7 @@ namespace WebApplication1.Controllers
 
         // PUT api/flowers/5
         [HttpPut("{id}")]
-        public IActionResult Update(int id, [FromBody] FlowerUpdateDto flowerDto)
+        public async Task <IActionResult> Update(int id, [FromBody] FlowerUpdateDto flowerDto)
         {
             var flower = _data.Flowers.FirstOrDefault(f => f.Id == id);
             if (flower == null) return NotFound();
@@ -111,13 +118,13 @@ namespace WebApplication1.Controllers
             flower.InStock = flowerDto.InStock;
             flower.CostPerUnit = flowerDto.CostPerUnit;
             flower.ColorId = flowerDto.ColorId;
-
+            await _data.SaveChangesAsync();
             return NoContent();
         }
 
         // DELETE api/flowers/5
         [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
+        public async Task <IActionResult> Delete(int id)
         {
             var flower = _data.Flowers.FirstOrDefault(f => f.Id == id);
             if (flower == null) return NotFound();
@@ -129,6 +136,7 @@ namespace WebApplication1.Controllers
             }
 
             _data.Flowers.Remove(flower);
+            await _data.SaveChangesAsync();
             return NoContent();
         }
     }
