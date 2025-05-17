@@ -105,24 +105,7 @@ namespace WebApplication1
     //    public ClientInfoDto Client { get; set; }
     //    public List<OrderItemResponseDto> Items { get; set; } = new();
     //}
-    public class ItemCreateDto
-    {
-        [Required]
-        [StringLength(100)]
-        public string Name { get; set; }
 
-        [Range(0.01, 10000)]
-        public decimal BasePrice { get; set; }
-    }
-
-    public class ItemUpdateDto
-    {
-        [StringLength(100)]
-        public string Name { get; set; }
-
-        [Range(0.01, 10000)]
-        public decimal BasePrice { get; set; }
-    }
     public class OrderFlowersResponseDto
     {
         public int OrderId { get; set; }
@@ -438,5 +421,17 @@ namespace WebApplication1
         public string Name { get; set; }
         public int QuantityRequired { get; set; }
         public decimal CostPerUnit { get; set; }
+    }
+    public class ItemCreateDto
+    {
+        public string Name { get; set; }
+        public decimal BasePrice { get; set; }
+        public int BoxId { get; set; }
+    }
+
+    public class ItemUpdateDto
+    {
+        public string Name { get; set; }
+        public decimal BasePrice { get; set; }
     }
 }

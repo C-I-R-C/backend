@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using WebApplication1;
 using WebApplication1.Models;
+using WebApplication1.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,7 +20,11 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "darizefir_API", Version = "v1" });
 });
 
-// Регистрация фильтров (ваши кастомные фильтры)
+builder.Services.AddScoped<ClientsService>();
+builder.Services.AddScoped<OrderService>();
+builder.Services.AddScoped<IngredientsService>();
+builder.Services.AddScoped<ItemsService>();
+
 builder.Services.AddScoped<ValidateModelAttribute>();
 builder.Services.AddScoped<LogActionFilter>();
 builder.Services.AddScoped<ConcurrencyCheckFilter>();
