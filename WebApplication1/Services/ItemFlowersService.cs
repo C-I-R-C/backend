@@ -1,32 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
+﻿using System.Security.AccessControl;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using WebApplication1;
 using WebApplication1.Models;
 
-namespace WebApplication1.Controllers
+namespace WebApplication1.Services
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class ItemFlowers1Controller : ControllerBase
+    public class ItemFlowersService
     {
         private readonly ApplicationDbContext _data;
 
-        public ItemFlowers1Controller(ApplicationDbContext context)
+        public ItemFlowersService(ApplicationDbContext context)
         {
             _data = context;
         }
 
-        // GET api/items/5/flowers
-        [HttpGet]
-        public async Task <ActionResult<IEnumerable<ItemFlowerDto>>> GetFlowersForItem(int itemId)
+        public async Task<List<ItemFlowerDto>> GetFlowersForItem(int itemId)
         {
             if (!_data.Items.Any(i => i.Id == itemId))
-                return NotFound("Item not found");
+                throw new DivideByZeroException();
 
             var itemFlowers = _data.ItemFlowers
                 .Where(itemf => itemf.ItemId == itemId)
@@ -53,18 +43,15 @@ namespace WebApplication1.Controllers
                     .FirstOrDefault()
             });
 
-            return Ok(itemFlowers);
+            return itemFlowers.ToList();
         }
-
-        // POST api/items/5/flowers
-        [HttpPost]
-        public async Task <ActionResult<ItemFlowerDto>> AddFlowerToItem(int itemId, [FromBody] AddFlowerToItemDto dto)
+        public async Task<ActionResult<ItemFlowerDto>> AddFlowerToItem(int itemId, [FromBody] AddFlowerToItemDto dto)
         {
             if (!_data.Items.Any(i => i.Id == itemId))
-                return NotFound("Item not found");
+                throw new DivideByZeroException();
 
             if (!_data.Flowers.Any(f => f.Id == dto.FlowerId))
-                return NotFound("Flower not found");
+                throw new DivideByZeroException();
 
             var existing = _data.ItemFlowers
                 .FirstOrDefault(itemf => itemf.ItemId == itemId && itemf.FlowerId == dto.FlowerId);
@@ -81,20 +68,12 @@ namespace WebApplication1.Controllers
                     FlowerId = dto.FlowerId,
                     Quantity = dto.Quantity
                 });
-                //_data.Items.First(i => i.Id == itemId).ItemFlowers.Add(new ItemFlower
-                //{
-                //    ItemId = itemId,
-                //    FlowerId = dto.FlowerId,
-                //    Quantity = dto.Quantity
-                //});
             }
 
             var flower = _data.Flowers.First(f => f.Id == dto.FlowerId);
 
             await _data.SaveChangesAsync();
-            return CreatedAtAction(
-                nameof(GetFlowersForItem),
-                new { itemId },
+            return
                 new ItemFlowerDto
                 {
                     ItemId = itemId,
@@ -113,35 +92,31 @@ namespace WebApplication1.Controllers
                             IsNatural = flower.Color.IsNatural
                         } : null
                     }
-                });
+                };
         }
 
-        // PUT api/items/5/flowers/3 (update quantity)
-        [HttpPut("{flowerId}")]
-        public IActionResult UpdateFlowerQuantity(int itemId, int flowerId, [FromBody] UpdateFlowerQuantityDto dto)
+        public async Task UpdateFlowerQuantity(int itemId, int flowerId, [FromBody] UpdateFlowerQuantityDto dto)
         {
             var itemFlower = _data.ItemFlowers
                 .FirstOrDefault(itemf => itemf.ItemId == itemId && itemf.FlowerId == flowerId);
 
             if (itemFlower == null)
-                return NotFound("Flower not found in this item");
+                throw new DivideByZeroException();
 
             itemFlower.Quantity = dto.Quantity;
-            return NoContent();
+            await _data.SaveChangesAsync();
         }
 
-        // DELETE api/items/5/flowers/3
-        [HttpDelete("{flowerId}")]
-        public IActionResult RemoveFlowerFromItem(int itemId, int flowerId)
+        public async Task RemoveFlowerFromItem(int itemId, int flowerId)
         {
             var itemFlower = _data.ItemFlowers
                 .FirstOrDefault(itemf => itemf.ItemId == itemId && itemf.FlowerId == flowerId);
 
             if (itemFlower == null)
-                return NotFound("Flower not found in this item");
+                throw new DivideByZeroException();
 
             _data.ItemFlowers.Remove(itemFlower);
-            return NoContent();
+            await _data.SaveChangesAsync();
         }
     }
 }

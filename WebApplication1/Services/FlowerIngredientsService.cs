@@ -1,35 +1,25 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using WebApplication1;
+using System.ComponentModel.DataAnnotations;
 using WebApplication1.Models;
 
-namespace WebApplication1.Controllers
+namespace WebApplication1.Services
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class FlowerIngredients1Controller : ControllerBase
+    public class FlowerIngredientsService
     {
         private readonly ApplicationDbContext _context;
 
-        public FlowerIngredients1Controller(ApplicationDbContext context)
+        public FlowerIngredientsService(ApplicationDbContext context)
         {
             _context = context;
         }
 
-        // GET: api/FlowerIngredients1
-        [HttpGet]
-        public async Task <ActionResult<IEnumerable<FlowerIngredientDto>>> GetIngredientsForFlower(int flowerId)
+        public async Task<List<FlowerIngredientDto>> GetIngredientsForFlower(int flowerId)
         {
             if (!_context.Flowers.Any(f => f.Id == flowerId))
-                return NotFound("Flower not found");
+                throw new DivideByZeroException();
 
-            return Ok(_context.FlowerIngredients
+            return _context.FlowerIngredients
                 .Where(fi => fi.FlowerId == flowerId)
                 .Select(fi => new FlowerIngredientDto
                 {
@@ -46,31 +36,26 @@ namespace WebApplication1.Controllers
                             CostPerUnit = i.CostPerUnit
                         })
                         .FirstOrDefault()
-                }));
+                }).ToList();
         }
 
-        // GET: api/FlowerIngredients1/5
-        [HttpGet("{id}")]
         public async Task<ActionResult<FlowerIngredient>> GetFlowerIngredient(int id)
         {
             var flowerIngredient = await _context.FlowerIngredients.FindAsync(id);
 
             if (flowerIngredient == null)
             {
-                return NotFound();
+                throw new DivideByZeroException();
             }
 
             return flowerIngredient;
         }
 
-        // PUT: api/FlowerIngredients1/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutFlowerIngredient(int id, FlowerIngredient flowerIngredient)
+        public async Task PutFlowerIngredient(int id, FlowerIngredient flowerIngredient)
         {
             if (id != flowerIngredient.FlowerId)
             {
-                return BadRequest();
+                throw new BadImageFormatException();
             }
 
             _context.Entry(flowerIngredient).State = EntityState.Modified;
@@ -83,28 +68,23 @@ namespace WebApplication1.Controllers
             {
                 if (!FlowerIngredientExists(id))
                 {
-                    return NotFound();
+                    throw new DivideByZeroException();
                 }
                 else
                 {
                     throw;
                 }
             }
-
-            return NoContent();
         }
 
-        // POST: api/FlowerIngredients1
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task <ActionResult<FlowerIngredientDto>> AddIngredientToFlower(
+        public async Task<ActionResult<FlowerIngredientDto>> AddIngredientToFlower(
             int flowerId, [FromBody] AddIngredientToFlowerDto dto)
         {
             if (!_context.Flowers.Any(f => f.Id == flowerId))
-                return NotFound("Flower not found");
+                throw new DivideByZeroException();
 
             if (!_context.Ingredients.Any(i => i.Id == dto.IngredientId))
-                return NotFound("Ingredient not found");
+                throw new DivideByZeroException();
 
             var existing = _context.FlowerIngredients
                 .FirstOrDefault(fi => fi.FlowerId == flowerId && fi.IngredientId == dto.IngredientId);
@@ -125,9 +105,7 @@ namespace WebApplication1.Controllers
 
             var ingredient = _context.Ingredients.First(i => i.Id == dto.IngredientId);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(
-                nameof(GetIngredientsForFlower),
-                new { flowerId },
+            return 
                 new FlowerIngredientDto
                 {
                     FlowerId = flowerId,
@@ -140,22 +118,19 @@ namespace WebApplication1.Controllers
                         InStock = ingredient.InStock,
                         CostPerUnit = ingredient.CostPerUnit
                     }
-                });
+                };
         }
-        // DELETE: api/FlowerIngredients1/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteFlowerIngredient(int id)
+
+        public async Task DeleteFlowerIngredient(int id)
         {
             var flowerIngredient = await _context.FlowerIngredients.FindAsync(id);
             if (flowerIngredient == null)
             {
-                return NotFound();
+                throw new DivideByZeroException();
             }
 
             _context.FlowerIngredients.Remove(flowerIngredient);
             await _context.SaveChangesAsync();
-
-            return NoContent();
         }
 
         private bool FlowerIngredientExists(int id)
@@ -163,12 +138,6 @@ namespace WebApplication1.Controllers
             return _context.FlowerIngredients.Any(e => e.FlowerId == id);
         }
     }
-    public class AddIngredientToFlowerDto
-    {
-        [Range(1, int.MaxValue)]
-        public int IngredientId { get; set; }
-
-        [Range(1, 100)]
-        public int QuantityRequired { get; set; }
-    }
+    
 }
+

@@ -4,6 +4,14 @@ using WebApplication1.Controllers;
 
 namespace WebApplication1
 {
+    public class AddIngredientToFlowerDto
+    {
+        [Range(1, int.MaxValue)]
+        public int IngredientId { get; set; }
+
+        [Range(1, 100)]
+        public int QuantityRequired { get; set; }
+    }
     public class ClientWithOrdersDto
     {
         public int Id { get; set; }

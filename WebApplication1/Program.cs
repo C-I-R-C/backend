@@ -24,6 +24,9 @@ builder.Services.AddScoped<ClientsService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<IngredientsService>();
 builder.Services.AddScoped<ItemsService>();
+builder.Services.AddScoped<FlowersService>();
+builder.Services.AddScoped<FlowerIngredientsService>();
+builder.Services.AddScoped<ItemFlowersService>();
 
 builder.Services.AddScoped<ValidateModelAttribute>();
 builder.Services.AddScoped<LogActionFilter>();

@@ -42,8 +42,6 @@ namespace WebApplication1.Controllers
             return box;
         }
 
-        // PUT: api/Boxes/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
         public async Task<IActionResult> PutBox(int id, Box box)
         {

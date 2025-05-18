@@ -1,29 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using WebApplication1;
+﻿using Microsoft.AspNetCore.Mvc;
 using WebApplication1.Models;
 
-namespace WebApplication1.Controllers
+namespace WebApplication1.Services
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class FlowersController : ControllerBase
+    public class FlowersService
     {
         private readonly ApplicationDbContext _data;
 
-        public FlowersController(ApplicationDbContext context)
+        public FlowersService(ApplicationDbContext context)
         {
             _data = context;
         }
 
-        // GET api/flowers
-        [HttpGet]
-        public async Task <ActionResult<IEnumerable<FlowerDto>>> GetAll()
+        public async Task<List<FlowerDto>> GetAll()
         {
             var flowers = _data.Flowers.Select(f => new FlowerDto
             {
@@ -39,17 +28,17 @@ namespace WebApplication1.Controllers
                 } : null
             });
 
-            return Ok(flowers);
+            return flowers.ToList();
         }
-
-        // GET api/flowers/5
-        [HttpGet("{id}")]
-        public async  Task <ActionResult<FlowerWithIngredientsDto>> GetById(int id)
+        public async Task<FlowerWithIngredientsDto> GetById(int id)
         {
             var flower = _data.Flowers.FirstOrDefault(f => f.Id == id);
-            if (flower == null) return NotFound();
+            if (flower == null)
+            {
+                throw new DivideByZeroException();
+            }
 
-            return Ok(new FlowerWithIngredientsDto
+            return new FlowerWithIngredientsDto
             {
                 Id = flower.Id,
                 Name = flower.Name,
@@ -80,12 +69,9 @@ namespace WebApplication1.Controllers
                             .FirstOrDefault()
                     })
                     .ToList()
-            });
+            };
         }
-
-        // POST api/flowers
-        [HttpPost]
-        public async Task <ActionResult<FlowerDto>> Create([FromBody] FlowerCreateDto flowerDto)
+        public async Task<FlowerDto> Create([FromBody] FlowerCreateDto flowerDto)
         {
             var flower = new Flower
             {
@@ -97,47 +83,42 @@ namespace WebApplication1.Controllers
 
             _data.Flowers.Add(flower);
             await _data.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = flower.Id },
-                new FlowerDto
+            return new FlowerDto
                 {
                     Id = flower.Id,
                     Name = flower.Name,
                     InStock = flower.InStock,
                     CostPerUnit = flower.CostPerUnit
-                });
+                };
         }
-
-        // PUT api/flowers/5
-        [HttpPut("{id}")]
-        public async Task <IActionResult> Update(int id, [FromBody] FlowerUpdateDto flowerDto)
+        public async Task Update(int id, [FromBody] FlowerUpdateDto flowerDto)
         {
             var flower = _data.Flowers.FirstOrDefault(f => f.Id == id);
-            if (flower == null) return NotFound();
-
+            if (flower == null)
+            {
+                throw new DivideByZeroException();
+            }
             flower.Name = flowerDto.Name;
             flower.InStock = flowerDto.InStock;
             flower.CostPerUnit = flowerDto.CostPerUnit;
             flower.ColorId = flowerDto.ColorId;
             await _data.SaveChangesAsync();
-            return NoContent();
         }
-
-        // DELETE api/flowers/5
-        [HttpDelete("{id}")]
-        public async Task <IActionResult> Delete(int id)
+        public async Task Delete(int id)
         {
             var flower = _data.Flowers.FirstOrDefault(f => f.Id == id);
-            if (flower == null) return NotFound();
+            if (flower == null){
+            throw new DivideByZeroException();
+            }
 
             // Check if flower is used in any items
             if (_data.ItemFlowers.Any(itemf => itemf.FlowerId == id))
             {
-                return BadRequest("Cannot delete flower used in items");
+                throw new BadImageFormatException();
             }
 
             _data.Flowers.Remove(flower);
             await _data.SaveChangesAsync();
-            return NoContent();
         }
     }
 }
