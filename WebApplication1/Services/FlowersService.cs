@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WebApplication1.Models;
 
 namespace WebApplication1.Services
@@ -119,6 +120,37 @@ namespace WebApplication1.Services
 
             _data.Flowers.Remove(flower);
             await _data.SaveChangesAsync();
+        }
+        public async Task<FlowerDto> UpdateQuantity(int id, FlowerQuantityUpdateDto updateDto)
+        {
+            var flower = await _data.Flowers.FindAsync(id);
+            if (flower == null)
+            {
+                throw new KeyNotFoundException("Flower not found");
+            }
+
+            if (updateDto.IsIncrement)
+            {
+                flower.InStock += updateDto.Quantity;
+            }
+            else
+            {
+                if (flower.InStock < updateDto.Quantity)
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot subtract {updateDto.Quantity} from stock. Only {flower.InStock} available.");
+                }
+                flower.InStock -= updateDto.Quantity;
+            }
+
+            await _data.SaveChangesAsync();
+            return new FlowerDto
+            {
+                Id = flower.Id,
+                Name = flower.Name,
+                CostPerUnit = flower.CostPerUnit,
+                InStock = flower.InStock,
+            };
         }
     }
 }

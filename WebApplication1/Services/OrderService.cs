@@ -110,14 +110,59 @@ namespace WebApplication1.Services
         }
         public async Task<OrderResponseDto> MarkAsCompleted(int id)
         {
-            var order = await _context.Orders.FindAsync(id);
+            // Load the order with its items
+            var order = await _context.Orders
+                .Include(o => o.OrderItems)
+                .FirstOrDefaultAsync(o => o.Id == id);
+
             if (order == null)
             {
-                throw new DivideByZeroException();
+                throw new KeyNotFoundException($"Order with ID {id} not found");
+            }
+
+            if (!order.IsCurrent)
+            {
+                throw new InvalidOperationException("Order is already completed");
+            }
+            var itemIds = order.OrderItems.Select(oi => oi.ItemId).ToList();
+
+                var itemsWithFlowers = await _context.Items
+                    .Where(i => itemIds.Contains(i.Id))
+                    .Include(i => i.ItemFlowers)
+                        .ThenInclude(itemf => itemf.Flower)
+            .ToListAsync();
+
+            // Create a dictionary for quick lookup
+            var itemsDictionary = itemsWithFlowers.ToDictionary(i => i.Id);
+            // Process each order item
+            foreach (var orderItem in order.OrderItems)
+            {
+                if (!itemsDictionary.TryGetValue(orderItem.ItemId, out var item))
+                {
+                    throw new KeyNotFoundException($"Item with ID {orderItem.ItemId} not found");
+                }
+
+                foreach (var itemFlower in item.ItemFlowers)
+                {
+                    var flower = itemFlower.Flower;
+                    if (flower == null) continue;
+
+                    var quantityToDeduct = itemFlower.Quantity * orderItem.Quantity;
+
+                    if (flower.InStock < quantityToDeduct)
+                    {
+                        throw new InvalidOperationException(
+                            $"Not enough stock for flower {flower.Name}. " +
+                            $"Required: {quantityToDeduct}, Available: {flower.InStock}");
+                    }
+
+                    flower.InStock -= quantityToDeduct;
+                }
             }
 
             order.IsCurrent = false;
             await _context.SaveChangesAsync();
+
             return MapToOrderResponseDto(order);
         }
         public async Task DeleteOrder(int id)

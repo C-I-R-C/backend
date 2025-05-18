@@ -96,5 +96,25 @@ namespace WebApplication1.Controllers
                 return Problem();
             }
         }
+        [HttpPatch("{id}/quantity")]
+        public async Task<ActionResult<FlowerDto>> UpdateQuantity(int id, [FromBody] FlowerQuantityUpdateDto updateDto)
+        {
+            try
+            {
+                return await _flowersService.UpdateQuantity(id, updateDto);
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound("Flower not found");
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch
+            {
+                return Problem();
+            }
+        }
     }
 }

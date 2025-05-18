@@ -90,14 +90,12 @@ namespace WebApplication1.Controllers
             }
         }
 
-        // PATCH: api/Orders/5/complete
         [HttpPatch("{id}/complete")]
-        public async Task<IActionResult> MarkAsCompleted(int id)
+        public async Task<ActionResult<OrderResponseDto>> MarkAsCompleted(int id)
         {
             try
             {
-                await _orderService.MarkAsCompleted(id);
-                return Ok();
+                return await _orderService.MarkAsCompleted(id);
             }
             catch (DivideByZeroException)
             {
@@ -105,7 +103,7 @@ namespace WebApplication1.Controllers
             }
             catch
             {
-                return Problem();
+                return Problem("BRUH");
             }
         }
 
