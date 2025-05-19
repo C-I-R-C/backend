@@ -97,25 +97,4 @@ namespace WebApplication1.Models
         public string Name { get; set; }
         public bool IsNatural { get; set; } 
     }
-    public class User
-    {
-        public int Id { get; set; }
-        public string Username { get; set; }
-        public string Email { get; set; }
-        public string PasswordHash { get; set; }
-        public string Role { get; set; }
-
-        // Email verification
-        public string? VerificationToken { get; set; }
-        public DateTime? VerifiedAt { get; set; }
-
-        // Password reset
-        public string? PasswordResetToken { get; set; }
-        public DateTime? ResetTokenExpires { get; set; }
-
-        // Refresh token
-        public string? RefreshToken { get; set; }
-        public DateTime? TokenCreated { get; set; }
-        public DateTime? TokenExpires { get; set; }
-    }
 }

@@ -116,5 +116,30 @@ namespace WebApplication1.Controllers
                 return Problem();
             }
         }
+        [HttpGet("search")]
+        public async Task<ActionResult<List<FlowerDto>>> SearchFlowersByName([FromQuery] string name)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    return BadRequest("Search term cannot be empty");
+                }
+
+                var flowers = await _flowersService.GetFlowersByName(name);
+
+                if (!flowers.Any())
+                {
+                    return NotFound("No flowers found matching the search criteria");
+                }
+
+                return Ok(flowers);
+            }
+            catch (Exception ex)
+            {
+                // Log the exception if needed
+                return StatusCode(500, "An error occurred while processing your request");
+            }
+        }
     }
 }

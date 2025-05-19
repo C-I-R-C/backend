@@ -85,7 +85,10 @@ namespace WebApplication1.Services
 
             if (!_context.Ingredients.Any(i => i.Id == dto.IngredientId))
                 throw new DivideByZeroException();
-
+            var flower = await _context.Flowers
+                .Include(f => f.FlowerIngredients)
+                .ThenInclude(fi => fi.Ingredient)
+                .FirstOrDefaultAsync(f => f.Id == flowerId);
             var existing = _context.FlowerIngredients
                 .FirstOrDefault(fi => fi.FlowerId == flowerId && fi.IngredientId == dto.IngredientId);
 
@@ -104,6 +107,7 @@ namespace WebApplication1.Services
             }
 
             var ingredient = _context.Ingredients.First(i => i.Id == dto.IngredientId);
+            flower.CostPerUnit = flower.FlowerIngredients.Sum(fi => fi.Ingredient.CostPerUnit * fi.QuantityRequired);
             await _context.SaveChangesAsync();
             return 
                 new FlowerIngredientDto
@@ -120,7 +124,7 @@ namespace WebApplication1.Services
                     }
                 };
         }
-
+        
         public async Task DeleteFlowerIngredient(int id)
         {
             var flowerIngredient = await _context.FlowerIngredients.FindAsync(id);

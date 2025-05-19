@@ -45,23 +45,6 @@ namespace WebApplication1.Controllers
 
         }
 
-        // GET: api/Clients/5/orders
-        [HttpGet("{id}/orders")]
-        public async Task<ActionResult<ClientWithOrdersDto>> GetClientWithOrders(int id)
-        {
-            try
-            {
-                return await _clientService.GetClientWithOrders(id);
-            }
-            catch (DivideByZeroException)
-            {
-                return NotFound();
-            }
-            catch
-            {
-                return Problem();
-            }
-        }
 
         // PUT: api/Clients/5
         [HttpPut("{id}")]
@@ -88,22 +71,6 @@ namespace WebApplication1.Controllers
         {
             return await _clientService.Create(clientDto);
         }
-        [HttpGet("{clientId}/allOrders")]
-        public async Task<ActionResult<IEnumerable<OrderResponseDto>>> GetClientOrders(int clientId)
-        {
-            try
-            {
-                return await GetClientOrders(clientId);
-            }
-            catch (DivideByZeroException)
-            {
-                return NotFound();
-            }
-            catch
-            {
-                return Problem();
-            }
-        }
         // DELETE: api/Clients/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteClient(int id)
@@ -122,7 +89,41 @@ namespace WebApplication1.Controllers
                 return Problem();
             }
         }
+        [HttpGet("search")]
+        public async Task<ActionResult<List<ClientWithDetailedOrdersDto>>> SearchClients(
+        [FromQuery] string searchTerm,
+        [FromQuery] bool? completedOrders = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    return BadRequest("Search term cannot be empty");
+                }
 
-        
+                var clients = await _clientService.SearchClients(searchTerm, completedOrders);
+
+                // Pagination
+                var pagedClients = clients
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList();
+
+                return Ok(new
+                {
+                    TotalCount = clients.Count,
+                    Page = page,
+                    PageSize = pageSize,
+                    Results = pagedClients
+                });
+            }
+            catch
+            {
+                return Problem();
+            }
+        }
+
     }
 }

@@ -148,29 +148,6 @@ namespace WebApplication1.Services
                     DiscountLevel = client.DiscountLevel
                 };
         }
-        public async Task<ActionResult<IEnumerable<OrderResponseDto>>> GetClientOrders(int clientId)
-        {
-            if (!await _context.Clients.AnyAsync(c => c.Id == clientId))
-            {
-                throw new DivideByZeroException();
-            }
-
-            var orders = await _context.Orders
-                .Where(o => o.ClientId == clientId)
-                .Include(o => o.Client)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Item)
-                        .ThenInclude(i => i.ItemFlowers)
-                            .ThenInclude(itemf => itemf.Flower)
-        .Include(o => o.OrderItems)
-            .ThenInclude(oi => oi.Item)
-                .ThenInclude(i => i.Box)
-        .OrderByDescending(o => o.OrderDate)
-        .ToListAsync();
-
-            var orderDtos = orders.Select(o => MapToOrderResponseDto(o)).ToList();
-            return orderDtos;
-        }
         private bool ClientExists(int id)
         {
             return _context.Clients.Any(e => e.Id == id);
@@ -246,6 +223,40 @@ namespace WebApplication1.Services
                 }).ToList() ?? new List<OrderItemWithDetailsDto>()
             };
         }
+        public async Task<List<ClientWithDetailedOrdersDto>> SearchClients(
+        string searchTerm,
+        bool? onlyCompletedOrders = null)
+        {
+            var query = _context.Clients
+                .Include(c => c.Orders)
+                    .ThenInclude(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Item)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(c =>
+                    c.Name.ToLower().Contains(searchTerm.ToLower()) ||
+                    c.PhoneNumber.Contains(searchTerm));
+            }
+
+            var clients = await query.ToListAsync();
+
+            return clients.Select(c => new ClientWithDetailedOrdersDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                PhoneNumber = c.PhoneNumber,
+                TotalOrdersCount = c.TotalOrdersCount,
+                DiscountLevel = c.DiscountLevel,
+                Orders = c.Orders
+                    .Where(o => onlyCompletedOrders == null ||
+                               o.IsCurrent == !onlyCompletedOrders.Value)
+                    .Select(o => MapToOrderResponseDto(o))
+                    .ToList()
+            }).ToList();
+        }
     }
+
 }
 

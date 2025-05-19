@@ -152,5 +152,25 @@ namespace WebApplication1.Services
                 InStock = flower.InStock,
             };
         }
+        public async Task<List<FlowerDto>> GetFlowersByName(string name)
+        {
+            return await _data.Flowers
+                .Where(f => f.Name.ToLower().Contains(name.ToLower()))
+                .Include(f => f.Color)  // Include the Color navigation property
+                .Select(f => new FlowerDto
+                {
+                    Id = f.Id,
+                    Name = f.Name,
+                    InStock = f.InStock,
+                    CostPerUnit = f.CostPerUnit,  // Using the stored cost
+                    Color = f.Color != null ? new ColorDto
+                    {
+                        Id = f.Color.Id,
+                        Name = f.Color.Name
+                        // Add other Color properties if needed
+                    } : null
+                })
+                .ToListAsync();
+        }
     }
 }
