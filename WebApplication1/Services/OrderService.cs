@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using WebApplication1.DTOs;
 using WebApplication1.Models;
 
 namespace WebApplication1.Services
@@ -55,6 +56,7 @@ namespace WebApplication1.Services
             {
                 ClientId = orderDto.ClientId,
                 OrderDate = DateTime.UtcNow,
+                OrderCompleteDate = orderDto.OrderCompleteDate ?? DateTime.MinValue,
                 Comment = orderDto.Comment,
                 IsCurrent = true,
                 OrderItems = orderDto.Items.Select(itemDto =>
@@ -161,6 +163,7 @@ namespace WebApplication1.Services
             }
 
             order.IsCurrent = false;
+            order.OrderCompleteDate = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
             return MapToOrderResponseDto(order);
@@ -194,6 +197,7 @@ namespace WebApplication1.Services
             {
                 Id = order.Id,
                 OrderDate = order.OrderDate,
+                OrderCompleteDate = order.OrderCompleteDate,
                 TotalPrice = order.TotalPrice,
                 IsCurrent = order.IsCurrent,
                 Comment = order.Comment,
@@ -246,6 +250,119 @@ namespace WebApplication1.Services
                     .ToList()
                 }).ToList() ?? new List<OrderItemWithDetailsDto>()
             };
+        }
+        public async Task<PagedResponse<OrderResponseDto>> QueryOrders(
+    DateTime? orderDate,
+    DateTime? completionDate,
+    bool? isCompleted,
+    int pageNumber = 1,
+    int pageSize = 20)
+        {
+            // 1. Prepare the base query with includes
+            var baseQuery = _context.Orders
+                .Include(o => o.Client)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Item)
+                .AsQueryable();
+
+            // 2. Convert input dates to UTC dates (date-only)
+            var utcOrderDate = orderDate.HasValue
+                ? orderDate.Value.Kind == DateTimeKind.Unspecified
+                    ? DateTime.SpecifyKind(orderDate.Value.Date, DateTimeKind.Utc)
+                    : orderDate.Value.Date.ToUniversalTime()
+                : (DateTime?)null;
+
+            var utcCompletionDate = completionDate.HasValue
+                ? completionDate.Value.Kind == DateTimeKind.Unspecified
+                    ? DateTime.SpecifyKind(completionDate.Value.Date, DateTimeKind.Utc)
+                    : completionDate.Value.Date.ToUniversalTime()
+                : (DateTime?)null;
+
+            // 3. Apply filters with PostgreSQL-compatible date comparison
+            if (utcOrderDate.HasValue)
+            {
+                baseQuery = baseQuery.Where(o =>
+                    o.OrderDate >= utcOrderDate.Value &&
+                    o.OrderDate < utcOrderDate.Value.AddDays(1));
+            }
+
+            if (utcCompletionDate.HasValue)
+            {
+                baseQuery = baseQuery.Where(o =>
+                    o.OrderCompleteDate >= utcCompletionDate.Value &&
+                    o.OrderCompleteDate < utcCompletionDate.Value.AddDays(1));
+            }
+
+            if (isCompleted.HasValue)
+            {
+                baseQuery = baseQuery.Where(o => o.IsCurrent == !isCompleted.Value);
+            }
+
+            // 4. Get total count (before pagination)
+            var totalCount = await baseQuery.CountAsync();
+
+            // 5. Apply pagination with ordering
+            var orders = await baseQuery
+    .OrderByDescending(o => o.OrderDate)
+    .Skip((pageNumber - 1) * pageSize)
+    .Take(pageSize)
+    .Select(o => new OrderResponseDto
+    {
+        Id = o.Id,
+        OrderDate = o.OrderDate,
+        OrderCompleteDate = o.OrderCompleteDate,
+        TotalPrice = o.TotalPrice,
+        IsCurrent = o.IsCurrent,
+        Comment = o.Comment,
+        Client = o.Client != null ? new ClientInfoDto
+        {
+            Id = o.Client.Id,
+            Name = o.Client.Name,
+            DiscountLevel = o.Client.DiscountLevel
+        } : null,
+        Items = o.OrderItems.Select(oi => new OrderItemWithDetailsDto
+        {
+            Id = oi.Id,
+            Quantity = oi.Quantity,
+            UnitPrice = oi.UnitPrice,
+            Item = oi.Item != null ? new ItemDto
+            {
+                Id = oi.Item.Id,
+                Name = oi.Item.Name,
+                BasePrice = oi.Item.BasePrice
+            } : null
+            // Include other OrderItemWithDetailsDto properties as needed
+        }).ToList()
+    })
+    .ToListAsync();
+            // 6. Return the paged result
+            return new PagedResponse<OrderResponseDto>
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                Items = orders
+            };
+        }
+        public async Task<List<UrgentOrderDto>> GetMostUrgentOrders(int count = 5)
+        {
+            var now = DateTime.UtcNow;
+
+            return await _context.Orders
+                .Where(o => o.IsCurrent) // Only unfinished orders
+                .Where(o => o.OrderCompleteDate > now) // Not yet past due
+                .OrderBy(o => o.OrderCompleteDate) // Orders with closest dates first
+                .Take(count) // Limit results
+                .Select(o => new UrgentOrderDto
+                {
+                    OrderId = o.Id,
+                    ClientName = o.Client.Name,
+                    CompletionDate = o.OrderCompleteDate,
+                    TimeUntilDue = o.OrderCompleteDate - now,
+                    ItemsCount = o.OrderItems.Count,
+                    TotalPrice = o.TotalPrice
+                })
+                .ToListAsync();
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.Drawing;
 
 namespace WebApplication1.Models
 {
@@ -17,7 +18,11 @@ namespace WebApplication1.Models
         public int Id { get; set; }
         public int ClientId { get; set; }
         public Client Client { get; set; }
+        [Column(TypeName = "timestamp with time zone")]
         public DateTime OrderDate { get; set; } = DateTime.UtcNow;
+
+        [Column(TypeName = "timestamp with time zone")]
+        public DateTime OrderCompleteDate { get; set; }
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
         public string Comment { get; set; }
         public decimal TotalPrice { get; set; } 
