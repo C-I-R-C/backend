@@ -40,4 +40,13 @@ namespace WebApplication1
         public int QuantityRequired { get; set; }
         public decimal CostPerUnit { get; set; }
     }
+    public class FlowerIngredientDtoNew
+    {
+        public int IngredientId { get; set; }
+        public string IngredientName { get; set; }
+        public decimal QuantityRequired { get; set; }
+        public decimal CostPerUnit { get; set; }
+        public decimal TotalCost { get; set; }
+    }
+
 }

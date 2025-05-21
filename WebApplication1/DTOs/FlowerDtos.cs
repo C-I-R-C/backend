@@ -89,5 +89,13 @@ namespace WebApplication1
         [Required]
         public bool IsIncrement { get; set; } // True to add, false to subtract
     }
-
+    public class FlowerWithIngredientsDtoNew
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public int InStock { get; set; }
+        public decimal CostPerUnit { get; set; }
+        public ColorDto Color { get; set; }
+        public List<FlowerIngredientDtoNew> Ingredients { get; set; } = new();
+    }
 }

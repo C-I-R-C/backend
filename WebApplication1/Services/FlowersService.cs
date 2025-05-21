@@ -123,52 +123,107 @@ namespace WebApplication1.Services
         }
         public async Task<FlowerDto> UpdateQuantity(int id, FlowerQuantityUpdateDto updateDto)
         {
-            var flower = await _data.Flowers.FindAsync(id);
-            if (flower == null)
-            {
-                throw new KeyNotFoundException("Flower not found");
-            }
+            // Start transaction
+            using var transaction = await _data.Database.BeginTransactionAsync();
 
-            if (updateDto.IsIncrement)
+            try
             {
-                flower.InStock += updateDto.Quantity;
-            }
-            else
-            {
-                if (flower.InStock < updateDto.Quantity)
+                // Get flower with ingredients and their ingredients
+                var flower = await _data.Flowers
+                    .Include(f => f.FlowerIngredients)
+                        .ThenInclude(fi => fi.Ingredient)
+                    .FirstOrDefaultAsync(f => f.Id == id);
+
+                if (flower == null)
                 {
-                    throw new InvalidOperationException(
-                        $"Cannot subtract {updateDto.Quantity} from stock. Only {flower.InStock} available.");
+                    throw new KeyNotFoundException("Flower not found");
                 }
-                flower.InStock -= updateDto.Quantity;
-            }
 
-            await _data.SaveChangesAsync();
-            return new FlowerDto
+                // Store original stock for potential rollback
+                var originalStock = flower.InStock;
+                var originalIngredientStocks = flower.FlowerIngredients
+                    .ToDictionary(fi => fi.IngredientId, fi => fi.Ingredient.InStock);
+
+                if (updateDto.IsIncrement)
+                {
+                    // Increase flower stock
+                    flower.InStock += updateDto.Quantity;
+
+                    // Decrease ingredient stocks
+                    foreach (var flowerIngredient in flower.FlowerIngredients)
+                    {
+                        var ingredient = flowerIngredient.Ingredient;
+                        var quantityToDeduct = flowerIngredient.QuantityRequired * updateDto.Quantity;
+
+                        if (ingredient.InStock < quantityToDeduct)
+                        {
+                            throw new InvalidOperationException(
+                                $"Not enough {ingredient.Name} in stock. " +
+                                $"Need {quantityToDeduct}, have {ingredient.InStock}");
+                        }
+
+                        ingredient.InStock -= quantityToDeduct;
+                    }
+                }
+                else
+                {
+                    // Decrease flower stock
+                    if (flower.InStock < updateDto.Quantity)
+                    {
+                        throw new InvalidOperationException(
+                            $"Cannot subtract {updateDto.Quantity} from stock. Only {flower.InStock} available.");
+                    }
+                    flower.InStock -= updateDto.Quantity;
+                }
+
+                await _data.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return new FlowerDto
+                {
+                    Id = flower.Id,
+                    Name = flower.Name,
+                    CostPerUnit = flower.CostPerUnit,
+                    InStock = flower.InStock,
+                    Color = flower.Color != null ? new ColorDto
+                    {
+                        Id = flower.Color.Id,
+                        Name = flower.Color.Name
+                    } : null
+                };
+            }
+            catch
             {
-                Id = flower.Id,
-                Name = flower.Name,
-                CostPerUnit = flower.CostPerUnit,
-                InStock = flower.InStock,
-            };
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
-        public async Task<List<FlowerDto>> GetFlowersByName(string name)
+        public async Task<List<FlowerWithIngredientsDtoNew>> GetFlowersByName(string name)
         {
             return await _data.Flowers
                 .Where(f => f.Name.ToLower().Contains(name.ToLower()))
-                .Include(f => f.Color)  // Include the Color navigation property
-                .Select(f => new FlowerDto
+                .Include(f => f.Color)
+                .Include(f => f.FlowerIngredients)
+                    .ThenInclude(fi => fi.Ingredient)
+                .Select(f => new FlowerWithIngredientsDtoNew
                 {
                     Id = f.Id,
                     Name = f.Name,
                     InStock = f.InStock,
-                    CostPerUnit = f.CostPerUnit,  // Using the stored cost
+                    CostPerUnit = f.CostPerUnit,
                     Color = f.Color != null ? new ColorDto
                     {
                         Id = f.Color.Id,
                         Name = f.Color.Name
-                        // Add other Color properties if needed
-                    } : null
+                    } : null,
+                    Ingredients = f.FlowerIngredients.Select(fi => new FlowerIngredientDtoNew
+                    {
+                        IngredientId = fi.IngredientId,
+                        IngredientName = fi.Ingredient.Name,
+                        QuantityRequired = fi.QuantityRequired,
+                        CostPerUnit = fi.Ingredient.CostPerUnit,
+                        TotalCost = fi.QuantityRequired * fi.Ingredient.CostPerUnit
+                    }).ToList()
                 })
                 .ToListAsync();
         }
