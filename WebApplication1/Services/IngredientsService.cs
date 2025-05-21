@@ -63,5 +63,62 @@ namespace WebApplication1.Services
         {
             return _context.Ingredients.Any(e => e.Id == id);
         }
+        public async Task<List<IngredientStockDto>> GetLowestStockIngredients(int count)
+        {
+            return await _context.Ingredients
+                .OrderBy(i => i.InStock)
+                .Take(count)
+                .Select(i => new IngredientStockDto
+                {
+                    Id = i.Id,
+                    Name = i.Name,
+                    InStock = i.InStock,
+                    CostPerUnit = i.CostPerUnit,
+                })
+                .ToListAsync();
+        }
+        public async Task<IngredientDto> UpdateIngredientStock(int id, UpdateIngredientStockDto updateDto)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                var ingredient = await _context.Ingredients.FindAsync(id);
+                if (ingredient == null)
+                {
+                    throw new KeyNotFoundException($"Ingredient with ID {id} not found");
+                }
+
+                if (updateDto.IsIncrement)
+                {
+                    ingredient.InStock += updateDto.Quantity;
+                }
+                else
+                {
+                    if (ingredient.InStock < updateDto.Quantity)
+                    {
+                        throw new InvalidOperationException(
+                            $"Cannot remove {updateDto.Quantity} from stock. Only {ingredient.InStock} available.");
+                    }
+                    ingredient.InStock -= updateDto.Quantity;
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return new IngredientDto
+                {
+                    Id = ingredient.Id,
+                    Name = ingredient.Name,
+                    InStock = ingredient.InStock,
+                    CostPerUnit = ingredient.CostPerUnit,
+                };
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
     }
 }

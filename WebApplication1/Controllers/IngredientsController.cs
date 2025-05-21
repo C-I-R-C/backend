@@ -88,6 +88,48 @@ namespace WebApplication1.Controllers
 
             return NoContent();
         }
+        [HttpGet("low-stock")]
+        public async Task<ActionResult<List<IngredientStockDto>>> GetLowStockIngredients(
+    [FromQuery] int count = 5)
+        {
+            try
+            {
+                // Validate input
+                if (count < 1 || count > 50)
+                {
+                    return BadRequest("Count must be between 1 and 50");
+                }
 
+                var lowStockIngredients = await _ingredientsService.GetLowestStockIngredients(count);
+                return Ok(lowStockIngredients);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving low stock ingredients");
+            }
+        }
+        [HttpPatch("{id}/stock")]
+        public async Task<ActionResult<IngredientDto>> UpdateIngredientStock(
+    int id,
+    [FromBody] UpdateIngredientStockDto updateDto)
+        {
+            try
+            {
+                var result = await _ingredientsService.UpdateIngredientStock(id, updateDto);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Error updating ingredient stock");
+            }
+        }
     }
 }

@@ -104,8 +104,6 @@ namespace WebApplication1.Controllers
                 }
 
                 var clients = await _clientService.SearchClients(searchTerm, completedOrders);
-
-                // Pagination
                 var pagedClients = clients
                     .Skip((page - 1) * pageSize)
                     .Take(pageSize)

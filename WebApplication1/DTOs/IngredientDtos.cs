@@ -48,5 +48,26 @@ namespace WebApplication1
         public decimal CostPerUnit { get; set; }
         public decimal TotalCost { get; set; }
     }
+    public class IngredientStockDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public int InStock { get; set; }
+        public decimal CostPerUnit { get; set; }
+        public string StockStatus => InStock switch
+        {
+            < 3 => "Critical",
+            < 5 => "Low",
+            _ => "Adequate"
+        };
+}
+    public class UpdateIngredientStockDto
+    {
+        [Required]
+        [Range(0, int.MaxValue, ErrorMessage = "Quantity must be positive")]
+        public int Quantity { get; set; }
 
+        [Required]
+        public bool IsIncrement { get; set; }
+    }
 }
