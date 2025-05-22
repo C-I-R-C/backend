@@ -1,35 +1,25 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using WebApplication1;
 using WebApplication1.Models;
 
-namespace WebApplication1.Controllers
+namespace WebApplication1.Services
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class ItemsController : ControllerBase
+    public class ItemsService
     {
         private readonly ApplicationDbContext _context;
 
-        public ItemsController(ApplicationDbContext context)
+        public ItemsService(ApplicationDbContext context)
         {
             _context = context;
         }
 
-        // GET: api/Items
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<ItemResponseDto>>> GetItems()
+        public async Task<List<ItemResponseDto>> GetItems()
         {
             var items = await _context.Items
                 .Include(i => i.Box)
                 .Include(i => i.ItemFlowers)
                     .ThenInclude(itemf => itemf.Flower)
-        .ToListAsync();
+                        .ToListAsync();
 
             var itemDtos = items.Select(i => new ItemResponseDto
             {
@@ -42,28 +32,24 @@ namespace WebApplication1.Controllers
                     Name = i.Box.Name,
                     InStock = i.Box.InStock
                 } : null,
-                // For list view, you might omit some deep relationships for performance
                 Flowers = i.ItemFlowers.Select(itemf => new ItemFlowerDetailDto
                 {
                     FlowerId = itemf.Flower.Id,
-            FlowerName = itemf.Flower.Name,
-            Quantity = itemf.Quantity
-         }).ToList()
-    }).ToList();
+                    FlowerName = itemf.Flower.Name,
+                    Quantity = itemf.Quantity
+                }).ToList()
+            }).ToList();
 
-    return Ok(itemDtos);
-}
-
-        // GET: api/Items/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<ItemResponseDto>> GetItem(int id)
+            return itemDtos;
+        }
+        public async Task<ItemResponseDto> GetItem(int id)
         {
             var item = await _context.Items
-                .Include(i => i.Box) // Include box
-                .Include(i => i.ItemFlowers) // Include flowers
-                    .ThenInclude(itemf => itemf.Flower) // Then include flower details
-                .ThenInclude(f => f.Color) // Then include color
-        .Include(i => i.ItemFlowers) // Include flowers again for ingredients
+                .Include(i => i.Box) 
+                .Include(i => i.ItemFlowers) 
+                    .ThenInclude(itemf => itemf.Flower) 
+                .ThenInclude(f => f.Color) 
+        .Include(i => i.ItemFlowers) 
             .ThenInclude(itemf => itemf.Flower)
                 .ThenInclude(f => f.FlowerIngredients)
                     .ThenInclude(fi => fi.Ingredient)
@@ -71,10 +57,10 @@ namespace WebApplication1.Controllers
 
             if (item == null)
             {
-                return NotFound();
+                throw new DivideByZeroException();
             }
 
-            // Map to DTO
+            
             var itemDto = new ItemResponseDto
             {
                 Id = item.Id,
@@ -89,58 +75,28 @@ namespace WebApplication1.Controllers
                 Flowers = item.ItemFlowers.Select(itemf => new ItemFlowerDetailDto
                 {
                     FlowerId = itemf.Flower.Id,
-            FlowerName = itemf.Flower.Name,
-            Quantity = itemf.Quantity,
-            UnitCost = itemf.Flower.CostPerUnit,
-            Color = itemf.Flower.Color?.Name ?? "N/A",
-            Ingredients = itemf.Flower.FlowerIngredients.Select(fi => new FlowerIngredient1Dto
-            {
-                IngredientId = fi.IngredientId,
-                Name = fi.Ingredient.Name,
-                QuantityRequired = fi.QuantityRequired,
-                CostPerUnit = fi.Ingredient.CostPerUnit
-            }).ToList()
-            }).ToList()
-    };
+                    FlowerName = itemf.Flower.Name,
+                    Quantity = itemf.Quantity,
+                    UnitCost = itemf.Flower.CostPerUnit,
+                    Color = itemf.Flower.Color?.Name ?? "N/A",
+                    Ingredients = itemf.Flower.FlowerIngredients.Select(fi => new FlowerIngredient1Dto
+                    {
+                        IngredientId = fi.IngredientId,
+                        Name = fi.Ingredient.Name,
+                        QuantityRequired = fi.QuantityRequired,
+                        CostPerUnit = fi.Ingredient.CostPerUnit
+                    }).ToList()
+                }).ToList()
+            };
 
-    // Calculate production cost
-
-    return Ok(itemDto);
-}
-
-//private decimal CalculateProductionCost(ItemResponseDto item)
-//{
-//    decimal cost = 0m;
-
-//    // Add flower costs
-//    foreach (var flower in item.Flowers)
-//    {
-//        cost += flower.Quantity * flower.UnitCost;
-
-//        // Add ingredient costs
-//        foreach (var ingredient in flower.Ingredients)
-//        {
-//            cost += ingredient.QuantityRequired * ingredient.CostPerUnit * flower.Quantity;
-//        }
-//    }
-
-//    // Add box cost if exists
-//    if (item.Box != null)
-//    {
-//        cost += item.Box.InStock > 0 ? item.Box.Cost : 0; // Only count if in stock
-//    }
-
-//    return cost;
-//}
-
-// PUT: api/Items/5
-[HttpPut("{id}")]
-        public async Task<IActionResult> PutItem(int id, ItemUpdateDto itemDto)
+            return itemDto;
+        }
+        public async Task PutItem(int id, ItemUpdateDto itemDto)
         {
             var item = await _context.Items.FindAsync(id);
             if (item == null)
             {
-                return NotFound();
+                throw new DivideByZeroException();
             }
 
             item.Name = itemDto.Name;
@@ -156,7 +112,7 @@ namespace WebApplication1.Controllers
             {
                 if (!ItemExists(id))
                 {
-                    return NotFound();
+                    throw new DivideByZeroException();
                 }
                 else
                 {
@@ -164,17 +120,14 @@ namespace WebApplication1.Controllers
                 }
             }
 
-            return NoContent();
+            
         }
-
-        // POST: api/Items
-        [HttpPost]
-        public async Task<ActionResult<Item>> PostItem(ItemCreateDto itemDto)
+        public async Task<Item> PostItem(ItemCreateDto itemDto)
         {
             // Check if box exists if BoxId is provided
             if (itemDto.BoxId != null && !await _context.Boxes.AnyAsync(b => b.Id == itemDto.BoxId))
             {
-                return BadRequest("Specified box does not exist");
+                throw new DivideByZeroException();
             }
 
             var item = new Item
@@ -182,7 +135,7 @@ namespace WebApplication1.Controllers
                 Name = itemDto.Name,
                 BasePrice = itemDto.BasePrice,
                 BoxId = itemDto.BoxId // Only set the foreign key
-                
+
             };
 
             _context.Items.Add(item);
@@ -196,49 +149,31 @@ namespace WebApplication1.Controllers
                     .LoadAsync();
             }
 
-            return CreatedAtAction("GetItem", new { id = item.Id }, item);
+            return item;
         }
-
-        // DELETE: api/Items/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteItem(int id)
+        public async Task DeleteItem(int id)
         {
             var item = await _context.Items.FindAsync(id);
             if (item == null)
             {
-                return NotFound();
+                throw new DivideByZeroException();
             }
 
             // Check if item is used in any orders
             var isUsedInOrders = await _context.OrderItems.AnyAsync(oi => oi.ItemId == id);
             if (isUsedInOrders)
             {
-                return BadRequest("Cannot delete item referenced in existing orders");
+                throw new DivideByZeroException();
             }
 
             _context.Items.Remove(item);
             await _context.SaveChangesAsync();
 
-            return NoContent();
         }
-
         private bool ItemExists(int id)
         {
             return _context.Items.Any(e => e.Id == id);
         }
-    }
 
-    // DTO classes
-    public class ItemCreateDto
-    {
-        public string Name { get; set; }
-        public decimal BasePrice { get; set; }
-        public int BoxId { get; set; }
-    }
-
-    public class ItemUpdateDto
-    {
-        public string Name { get; set; }
-        public decimal BasePrice { get; set; }
     }
 }

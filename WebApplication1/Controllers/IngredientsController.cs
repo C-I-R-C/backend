@@ -7,18 +7,21 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1;
 using WebApplication1.Models;
+using WebApplication1.Services;
 
 namespace WebApplication1.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class Ingredients1Controller : ControllerBase
+    public class IngredientsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IngredientsService _ingredientsService;
 
-        public Ingredients1Controller(ApplicationDbContext context)
+        public IngredientsController(ApplicationDbContext context, IngredientsService ingredientsService)
         {
             _context = context;
+            _ingredientsService = ingredientsService;
         }
 
         // GET: api/Ingredients1
@@ -47,30 +50,18 @@ namespace WebApplication1.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutIngredient(int id, Ingredient ingredient)
         {
-            if (id != ingredient.Id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(ingredient).State = EntityState.Modified;
-
             try
             {
-                await _context.SaveChangesAsync();
+                await _ingredientsService.PutIngredient(id, ingredient);
+                return Ok();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (ArgumentException)
             {
-                if (!IngredientExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                return NoContent();
             }
-
-            return NoContent();
+            catch {
+                return Problem();
+            }
         }
 
         // POST: api/Ingredients1
@@ -78,23 +69,7 @@ namespace WebApplication1.Controllers
         [HttpPost]
         public async Task <ActionResult<IngredientDto>> Create([FromBody] IngredientCreateDto dto)
         {
-            var ingredient = new Ingredient
-            {
-                Name = dto.Name,
-                InStock = dto.InStock,
-                CostPerUnit = dto.CostPerUnit
-            };
-
-            _context.Ingredients.Add(ingredient);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetIngredient), new { id = ingredient.Id },
-                new IngredientDto
-                {
-                    Id = ingredient.Id,
-                    Name = ingredient.Name,
-                    InStock = ingredient.InStock,
-                    CostPerUnit = ingredient.CostPerUnit
-                });
+            return await _ingredientsService.Create(dto);
         }
 
 
@@ -113,10 +88,48 @@ namespace WebApplication1.Controllers
 
             return NoContent();
         }
-
-        private bool IngredientExists(int id)
+        [HttpGet("low-stock")]
+        public async Task<ActionResult<List<IngredientStockDto>>> GetLowStockIngredients(
+    [FromQuery] int count = 5)
         {
-            return _context.Ingredients.Any(e => e.Id == id);
+            try
+            {
+                // Validate input
+                if (count < 1 || count > 50)
+                {
+                    return BadRequest("Count must be between 1 and 50");
+                }
+
+                var lowStockIngredients = await _ingredientsService.GetLowestStockIngredients(count);
+                return Ok(lowStockIngredients);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving low stock ingredients");
+            }
+        }
+        [HttpPatch("{id}/stock")]
+        public async Task<ActionResult<IngredientDto>> UpdateIngredientStock(
+    int id,
+    [FromBody] UpdateIngredientStockDto updateDto)
+        {
+            try
+            {
+                var result = await _ingredientsService.UpdateIngredientStock(id, updateDto);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Error updating ingredient stock");
+            }
         }
     }
 }

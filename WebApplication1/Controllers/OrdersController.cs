@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1;
+using WebApplication1.DTOs;
 using WebApplication1.Models;
+using WebApplication1.Services;
 
 namespace WebApplication1.Controllers
 {
@@ -15,227 +17,166 @@ namespace WebApplication1.Controllers
     public class OrdersController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly OrderService _orderService;
 
-        public OrdersController(ApplicationDbContext context)
+        public OrdersController(ApplicationDbContext context, OrderService orderService)
         {
             _context = context;
+            _orderService = orderService;
         }
 
         // GET: api/Orders
         [HttpGet]
         public async Task<ActionResult<IEnumerable<OrderResponseDto>>> GetOrders()
         {
-            var orders = await _context.Orders
-                .Include(o => o.Client)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Item)
-                .ToListAsync();
-
-            return orders.Select(MapToOrderResponseDto).ToList();
+            return await _orderService.GetOrders();
         }
 
         // GET: api/Orders/5
         [HttpGet("{id}")]
         public async Task<ActionResult<OrderResponseDto>> GetOrder(int id)
         {
-            var order = await _context.Orders
-                .Include(o => o.Client)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Item)
-                .FirstOrDefaultAsync(o => o.Id == id);
-
-            if (order == null)
+            try
+            {
+                return await _orderService.GetOrder(id);
+            }
+            catch (DivideByZeroException)
             {
                 return NotFound();
             }
-
-            return MapToOrderResponseDto(order);
+            catch
+            {
+                return Problem();
+            }
         }
 
         // POST: api/Orders
         [HttpPost]
-        public async Task <ActionResult<OrderResponseDto>> Create([FromBody] OrderCreateDto orderDto)
+        public async Task<ActionResult<OrderResponseDto>> Create([FromBody] OrderCreateDto orderDto)
         {
-            // Validate client exists
-            var client = _context.Clients.FirstOrDefault(c => c.Id == orderDto.ClientId);
-            if (client == null) return BadRequest("Client not found");
-
-            // Validate all items exist
-            foreach (var itemDto in orderDto.Items)
+            try
             {
-                if (!_context.Items.Any(i => i.Id == itemDto.ItemId))
-                    return BadRequest($"Item with ID {itemDto.ItemId} not found");
+                return await _orderService.Create(orderDto);
             }
-
-            var order = new Order
+            catch (ArgumentException)
             {
-                ClientId = orderDto.ClientId,
-                OrderDate = DateTime.UtcNow,
-                Comment = orderDto.Comment,
-                IsCurrent = true,
-                OrderItems = orderDto.Items.Select(itemDto =>
-                {
-                    var item = _context.Items.First(i => i.Id == itemDto.ItemId);
-                    return new OrderItem
-                    {
-                        ItemId = item.Id,
-                        Quantity = itemDto.Quantity,
-                        UnitPrice = item.BasePrice // Store price at time of order
-                    };
-                }).ToList()
-            };
-
-            // Calculate total with discount
-            order.TotalPrice = order.OrderItems.Sum(oi => oi.UnitPrice * oi.Quantity)
-                              * (100 - client.DiscountLevel) / 100;
-
-            _context.Orders.Add(order);
-
-            // Update client's order count
-            client.TotalOrdersCount = _context.Orders.Count(o => o.ClientId == client.Id);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetOrder), new { id = order.Id },
-                MapToOrderResponseDto(order));
+                return BadRequest("Client not found");
+            }
+            catch (AbandonedMutexException)
+            {
+                return BadRequest($"Item not found");
+            }
+            catch
+            {
+                return Problem();
+            }
         }
 
         // PUT: api/Orders/5
         [HttpPut("{id}")]
         public async Task<IActionResult> PutOrder(int id, OrderUpdateDto orderDto)
         {
-            var order = await _context.Orders.FindAsync(id);
-            if (order == null)
-            {
-                return NotFound();
-            }
-
-            // Only allow updating certain fields
-            order.Comment = orderDto.Comment ?? order.Comment;
-            order.IsCurrent = orderDto.IsCurrent ?? order.IsCurrent;
-
             try
             {
-                await _context.SaveChangesAsync();
+                await _orderService.PutOrder(id, orderDto);
+                return NoContent();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DivideByZeroException)
             {
-                if (!OrderExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                return BadRequest("OrderNotFound");
             }
-
-            return NoContent();
+            catch
+            {
+                return Problem();
+            }
         }
 
-        // PATCH: api/Orders/5/complete
         [HttpPatch("{id}/complete")]
-        public async Task<IActionResult> MarkAsCompleted(int id)
+        public async Task<ActionResult<OrderResponseDto>> MarkAsCompleted(int id)
         {
-            var order = await _context.Orders.FindAsync(id);
-            if (order == null)
+            try
             {
-                return NotFound();
+                return await _orderService.MarkAsCompleted(id);
             }
-
-            order.IsCurrent = false;
-            await _context.SaveChangesAsync();
-
-            return Ok(MapToOrderResponseDto(order));
+            catch (DivideByZeroException)
+            {
+                return BadRequest("OrderNotFound");
+            }
+            catch
+            {
+                return Problem("BRUH");
+            }
         }
 
         // DELETE: api/Orders/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteOrder(int id)
         {
-            var order = await _context.Orders.FindAsync(id);
-            if (order == null)
+            try
             {
-                return NotFound();
+                await _orderService.DeleteOrder(id);
+                return NoContent();
             }
-
-            _context.Orders.Remove(order);
-            await _context.SaveChangesAsync();
-
-            // Update client's order count if client still exists
-            var client = await _context.Clients.FindAsync(order.ClientId);
-            if (client != null)
+            catch (DivideByZeroException)
             {
-                client.TotalOrdersCount = await _context.Orders.CountAsync(o => o.ClientId == client.Id);
-                await _context.SaveChangesAsync();
+                return BadRequest("OrderNotFound");
             }
-
-            return NoContent();
-        }
-
-        private bool OrderExists(int id)
-        {
-            return _context.Orders.Any(e => e.Id == id);
-        }
-
-        private OrderResponseDto MapToOrderResponseDto(Order order)
-        {
-            return new OrderResponseDto
+            catch
             {
-                Id = order.Id,
-                OrderDate = order.OrderDate,
-                TotalPrice = order.TotalPrice,
-                IsCurrent = order.IsCurrent,
-                Comment = order.Comment,
-                Client = order.Client != null ? new ClientInfoDto
+                return Problem();
+            }
+        }
+        [HttpGet("query")]
+        public async Task<ActionResult<PagedResponse<OrderResponseDto>>> QueryOrders(
+    [FromQuery] OrderQueryDto query,
+    [FromQuery] int pageNumber = 1,
+    [FromQuery] int pageSize = 20)
+        {
+
+                // Validate pagination parameters
+                if (pageNumber < 1) return BadRequest("Page number must be at least 1");
+                if (pageSize < 1 || pageSize > 100) return BadRequest("Page size must be between 1 and 100");
+                DateTime? OrderDate =
+                DateTime.TryParse(query.OrderDateString, out var date)? DateTime.SpecifyKind(date.Date, DateTimeKind.Utc) : null;
+                DateTime? CompletionDate = DateTime.TryParse(query.CompletionDateString, out var date1) ? DateTime.SpecifyKind(date1.Date, DateTimeKind.Utc): null;
+            // Validate at least one filter is provided
+            if (OrderDate == null &&
+                    CompletionDate == null &&
+                    !query.IsCompleted.HasValue)
                 {
-                    Id = order.Client.Id,
-                    Name = order.Client.Name,
-                    DiscountLevel = order.Client.DiscountLevel
-                } : null,
-                Items = order.OrderItems?.Select(oi => new OrderItemWithDetailsDto
+                    return BadRequest("At least one filter parameter must be provided");
+                }
+
+                var result = await _orderService.QueryOrders(
+                    OrderDate,
+                    CompletionDate,
+                    query.IsCompleted,
+                    pageNumber,
+                    pageSize);
+
+                if (result.TotalCount == 0)
                 {
-                    Id = oi.Id,
-                    Quantity = oi.Quantity,
-                    UnitPrice = oi.UnitPrice,
-                    Item = oi.Item != null ? new ItemDto
-                    {
-                        Id = oi.Item.Id,
-                        Name = oi.Item.Name,
-                        BasePrice = oi.Item.BasePrice
-                    } : null,
-                     Flowers = _context.ItemFlowers
-                    .Where(itemf => itemf.ItemId == oi.ItemId)
-                    .Include(itemf => itemf.Flower)
-                        .ThenInclude(f => f.Color)
-                    .Include(itemf => itemf.Flower)
-                        .ThenInclude(f => f.FlowerIngredients)
-                            .ThenInclude(fi => fi.Ingredient)
-                    .Select(itemf => new FlowerDetailDto
-                    {
-                        FlowerId = itemf.FlowerId,
-                        FlowerName = itemf.Flower != null ? itemf.Flower.Name : "Unknown",
-                        QuantityPerItem = itemf.Quantity,
-                        TotalQuantity = itemf.Quantity * oi.Quantity,
-                        UnitCost = itemf.Flower != null ? itemf.Flower.CostPerUnit : 0,
-                        Color = itemf.Flower != null && itemf.Flower.Color != null
-                            ? itemf.Flower.Color.Name
-                            : "N/A",
-                        Ingredients = itemf.Flower != null && itemf.Flower.FlowerIngredients != null
-                            ? itemf.Flower.FlowerIngredients
-                                .Select(fi => new IngredientDto
-                                {
-                                    Id = fi.IngredientId,
-                                    Name = fi.Ingredient != null ? fi.Ingredient.Name : "Unknown",
-                                    InStock = fi.Ingredient != null ? fi.Ingredient.InStock : 0,
-                                    CostPerUnit = fi.Ingredient != null ? fi.Ingredient.CostPerUnit : 0
-                                })
-                                .ToList()
-                            : new List<IngredientDto>()
-                    })
-                    .ToList()
-                }).ToList() ?? new List<OrderItemWithDetailsDto>()
-            };
+                    return NotFound("No orders match the specified criteria");
+                }
+
+                return Ok(result);
+            }
+        [HttpGet("urgent")]
+        public async Task<ActionResult<List<UrgentOrderDto>>> GetUrgentOrders(
+    [FromQuery] int count = 5)
+        {
+            try
+            {
+                if (count < 1 || count > 20)
+                    return BadRequest("Count must be between 1 and 20");
+
+                var urgentOrders = await _orderService.GetMostUrgentOrders(count);
+                return Ok(urgentOrders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Error retrieving urgent orders");
+            }
         }
     }
-
-    // DTO classes
-}
+    }
