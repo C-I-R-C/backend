@@ -1,6 +1,7 @@
-﻿using System.Drawing;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.Drawing;
 
-namespace WebApplication1
+namespace WebApplication1.Models
 {
     public class Client
     {
@@ -17,7 +18,11 @@ namespace WebApplication1
         public int Id { get; set; }
         public int ClientId { get; set; }
         public Client Client { get; set; }
+        [Column(TypeName = "timestamp with time zone")]
         public DateTime OrderDate { get; set; } = DateTime.UtcNow;
+
+        [Column(TypeName = "timestamp with time zone")]
+        public DateTime OrderCompleteDate { get; set; }
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
         public string Comment { get; set; }
         public decimal TotalPrice { get; set; } 
@@ -62,11 +67,7 @@ namespace WebApplication1
         public string Name { get; set; }
         public int InStock { get; set; }
         public decimal CostPerUnit { get; set; }
-
-        // Many-to-many with Ingredients through FlowerIngredient
         public ICollection<FlowerIngredient> FlowerIngredients { get; set; } = new List<FlowerIngredient>();
-
-        // One-to-many with Colors (if flowers can have colors)
         public int? ColorId { get; set; }
         public Color Color { get; set; }
     }
@@ -74,7 +75,7 @@ namespace WebApplication1
     {
         public int Id { get; set; }
         public string Name { get; set; }
-        public int inStock { get; set; }
+        public int InStock { get; set; }
 
     }
     public class Ingredient
@@ -101,10 +102,4 @@ namespace WebApplication1
         public string Name { get; set; }
         public bool IsNatural { get; set; } 
     }
-    public record StockCheckResult(
-    bool IsAvailable,
-    int CurrentStock,
-    int MissingAmount
-);
-
 }
