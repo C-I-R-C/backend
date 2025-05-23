@@ -22,12 +22,14 @@ namespace WebApplication1
         public int InStock { get; set; } = 0;
     }
 
-    public class BoxUpdateDto
+    public class BoxStockUpdateDto
     {
-        [StringLength(100, ErrorMessage = "Name cannot exceed 100 characters")]
-        public string Name { get; set; }
+        [Required]
+        [Range(1, int.MaxValue, ErrorMessage = "Quantity must be positive")]
+        public int Quantity { get; set; }
 
-        [Range(0, int.MaxValue, ErrorMessage = "Stock cannot be negative")]
-        public int? InStock { get; set; }
+        [Required]
+        public bool IsIncrement { get; set; }
+
     }
 }

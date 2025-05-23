@@ -128,11 +128,11 @@ namespace WebApplication1.Services
             }
             var itemIds = order.OrderItems.Select(oi => oi.ItemId).ToList();
 
-                var itemsWithFlowers = await _context.Items
-                    .Where(i => itemIds.Contains(i.Id))
-                    .Include(i => i.ItemFlowers)
-                        .ThenInclude(itemf => itemf.Flower)
-            .ToListAsync();
+            var itemsWithFlowers = await _context.Items
+                .Where(i => itemIds.Contains(i.Id))
+                .Include(i => i.ItemFlowers)
+                    .ThenInclude(itemf => itemf.Flower)
+        .ToListAsync();
 
             // Create a dictionary for quick lookup
             var itemsDictionary = itemsWithFlowers.ToDictionary(i => i.Id);
@@ -159,6 +159,15 @@ namespace WebApplication1.Services
                     }
 
                     flower.InStock -= quantityToDeduct;
+
+                }
+                if (item.BoxId.HasValue)
+                {
+                    var box = await _context.Boxes.FindAsync(item.BoxId.Value);
+                    if (box != null)
+                    {
+                        box.InStock -= 1;
+                    }
                 }
             }
 

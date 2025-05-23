@@ -8,21 +8,22 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1;
 using WebApplication1.Models;
+using WebApplication1.Services;
 
 namespace WebApplication1.Controllers
 {
-    [Authorize]
+    //[Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class BoxesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-
-        public BoxesController(ApplicationDbContext context)
+        private readonly BoxService _boxService;
+        public BoxesController(ApplicationDbContext context, BoxService boxService)
         {
             _context = context;
+            _boxService = boxService;
         }
-
         // GET: api/Boxes
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Box>>> GetBoxes()
@@ -106,7 +107,34 @@ namespace WebApplication1.Controllers
 
             return NoContent();
         }
+        [HttpPatch("{id}/stock")]
+        public async Task<ActionResult<BoxDto>> UpdateBoxStock(
+        int id,
+        [FromBody] BoxStockUpdateDto updateDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
 
+                var result = await _boxService.UpdateBoxStock(id, updateDto);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Error updating box stock");
+            }
+        }
         private bool BoxExists(int id)
         {
             return _context.Boxes.Any(e => e.Id == id);

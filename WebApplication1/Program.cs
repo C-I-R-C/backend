@@ -52,6 +52,7 @@ builder.Services.AddScoped<FlowersService>();
 builder.Services.AddScoped<FlowerIngredientsService>();
 builder.Services.AddScoped<ItemFlowersService>();
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<BoxService>();
 
 builder.Services.AddScoped<ValidateModelAttribute>();
 builder.Services.AddScoped<LogActionFilter>();
