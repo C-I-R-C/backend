@@ -107,7 +107,7 @@ namespace WebApplication1.Services
             }
 
             var ingredient = _context.Ingredients.First(i => i.Id == dto.IngredientId);
-            flower.CostPerUnit = flower.FlowerIngredients.Sum(fi => fi.Ingredient.CostPerUnit * fi.QuantityRequired);
+            flower.CostPerUnit = flower.CostPerUnit + ingredient.CostPerUnit * existing.QuantityRequired;
             await _context.SaveChangesAsync();
             return 
                 new FlowerIngredientDto

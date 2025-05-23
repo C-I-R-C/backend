@@ -29,7 +29,7 @@ namespace WebApplication1
     {
         public int FlowerId { get; set; }
         public int IngredientId { get; set; }
-        public int QuantityRequired { get; set; }
+        public decimal QuantityRequired { get; set; }
         public IngredientDto Ingredient { get; set; }
     }
 
@@ -44,7 +44,7 @@ namespace WebApplication1
     {
         public int IngredientId { get; set; }
         public string IngredientName { get; set; }
-        public decimal QuantityRequired { get; set; }
+        public int QuantityRequired { get; set; }
         public decimal CostPerUnit { get; set; }
         public decimal TotalCost { get; set; }
     }

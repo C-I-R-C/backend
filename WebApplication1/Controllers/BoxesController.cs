@@ -24,14 +24,11 @@ namespace WebApplication1.Controllers
             _context = context;
             _boxService = boxService;
         }
-        // GET: api/Boxes
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Box>>> GetBoxes()
         {
             return await _context.Boxes.ToListAsync();
         }
-
-        // GET: api/Boxes/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Box>> GetBox(int id)
         {
@@ -82,13 +79,14 @@ namespace WebApplication1.Controllers
             var box = new Box
             {
                 Name = dto.Name,
-                InStock = dto.InStock
+                InStock = dto.InStock,
+                CostPerUnit = dto.CostPerUnit,
             };
 
             _context.Boxes.Add(box);
             await _context.SaveChangesAsync();
             return CreatedAtAction(nameof(PutBox), new { id = box.Id },
-                new BoxDto { Id = box.Id, Name = box.Name, InStock = box.InStock });
+                new BoxDto { Id = box.Id, Name = box.Name, InStock = box.InStock, CostPerUnit = box.CostPerUnit });
         }
 
 

@@ -10,6 +10,7 @@ namespace WebApplication1
         public int Id { get; set; }
         public string Name { get; set; }
         public int InStock { get; set; }
+        public decimal CostPerUnit { get; set; }
     }
 
     public class BoxCreateDto
@@ -20,6 +21,8 @@ namespace WebApplication1
 
         [Range(0, int.MaxValue, ErrorMessage = "Stock cannot be negative")]
         public int InStock { get; set; } = 0;
+        [Required(ErrorMessage = "Box cost is required")]
+        public decimal CostPerUnit { get; set; }
     }
 
     public class BoxStockUpdateDto

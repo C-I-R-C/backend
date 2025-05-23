@@ -146,7 +146,6 @@ namespace WebApplication1.Services
 
                 if (updateDto.IsIncrement)
                 {
-                    // Increase flower stock
                     
                     
                     foreach (var flowerIngredient in flower.FlowerIngredients)

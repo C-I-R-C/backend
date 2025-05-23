@@ -87,23 +87,85 @@ namespace WebApplication1.Controllers
         }
         [HttpPost]
         public async Task<ActionResult<FlowerIngredientDto>> AddIngredientToFlower(
-            int flowerId, [FromBody] AddIngredientToFlowerDto dto)
+    int flowerId, [FromBody] AddIngredientToFlowerDto dto)
         {
+            // Validate input
+            if (dto == null)
+                return BadRequest("Ingredient data is required");
+
+            if (dto.QuantityRequired <= 0)
+                return BadRequest("Quantity must be greater than zero");
+
+            // Check if flower exists
+            var flower = await _context.Flowers
+                .Include(f => f.FlowerIngredients)
+                .ThenInclude(fi => fi.Ingredient)
+                .FirstOrDefaultAsync(f => f.Id == flowerId);
+
+            if (flower == null)
+                return NotFound($"Flower with ID {flowerId} not found");
+
+            // Check if ingredient exists
+            var ingredient = await _context.Ingredients
+                .FirstOrDefaultAsync(i => i.Id == dto.IngredientId);
+
+            if (ingredient == null)
+                return NotFound($"Ingredient with ID {dto.IngredientId} not found");
+
             try
             {
-                return await _flowerIngredientsService.AddIngredientToFlower(flowerId, dto);
+                // Find existing relationship or create new
+                var existing = flower.FlowerIngredients
+                    .FirstOrDefault(fi => fi.IngredientId == dto.IngredientId);
+
+                decimal costChange = 0;
+
+                if (existing != null)
+                {
+                    // Calculate cost difference for existing ingredient
+                    costChange = ingredient.CostPerUnit *
+                                (dto.QuantityRequired - existing.QuantityRequired);
+                    existing.QuantityRequired = dto.QuantityRequired;
+                }
+                else
+                {
+                    // Calculate cost for new ingredient
+                    costChange = ingredient.CostPerUnit * dto.QuantityRequired;
+
+                    var newFlowerIngredient = new FlowerIngredient
+                    {
+                        FlowerId = flowerId,
+                        IngredientId = dto.IngredientId,
+                        QuantityRequired = dto.QuantityRequired
+                    };
+
+                    _context.FlowerIngredients.Add(newFlowerIngredient);
+                    flower.FlowerIngredients.Add(newFlowerIngredient);
+                }
+
+                // Update flower cost
+                flower.CostPerUnit += costChange;
+
+                await _context.SaveChangesAsync();
+
+                // Return the DTO
+                return Ok(new FlowerIngredientDto
+                {
+                    FlowerId = flowerId,
+                    IngredientId = dto.IngredientId,
+                    QuantityRequired = dto.QuantityRequired,
+                    Ingredient = new IngredientDto
+                    {
+                        Id = ingredient.Id,
+                        Name = ingredient.Name,
+                        InStock = ingredient.InStock,
+                        CostPerUnit = ingredient.CostPerUnit
+                    }
+                });
             }
-            catch (DivideByZeroException)
+            catch (Exception ex)
             {
-                return NotFound();
-            }
-            catch (BadImageFormatException)
-            {
-                return NotFound("No such flower");
-            }
-            catch
-            {
-                return Problem();
+                return StatusCode(500, "An error occurred while processing your request");
             }
         }
         [HttpDelete("{id}")]

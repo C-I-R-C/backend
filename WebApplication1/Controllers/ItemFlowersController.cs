@@ -43,10 +43,10 @@ namespace WebApplication1.Controllers
             {
                 return BadRequest("Item or flower not found");
             }
-            catch
-            {
-                return Problem();
-            }
+            //catch
+            //{
+            //    return Problem();
+            //}
         }
 
         // PUT api/items/5/flowers/3 (update quantity)
