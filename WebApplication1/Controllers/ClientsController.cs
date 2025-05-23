@@ -45,26 +45,59 @@ namespace WebApplication1.Controllers
 
         }
 
-
-        // PUT: api/Clients/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutClient(int id, ClientUpdateDto clientDto)
+        public async Task<IActionResult> PutClient(int id, [FromBody] ClientUpdateDto clientDto)
         {
+            // Validate input
+            if (clientDto == null)
+                return BadRequest("Client data is required");
+
+            if (id != clientDto.Id)
+                return BadRequest("ID mismatch");
+
+            // Find existing client
+            var client = await _context.Clients.FindAsync(id);
+            if (client == null)
+                return NotFound($"Client with ID {id} not found");
+
+            // Update fields if provided
+            if (!string.IsNullOrWhiteSpace(clientDto.Name))
+                client.Name = clientDto.Name.Trim();
+
+            if (!string.IsNullOrWhiteSpace(clientDto.PhoneNumber))
+                client.PhoneNumber = clientDto.PhoneNumber.Trim();
+
+            if (clientDto.DiscountLevel.HasValue)
+            {
+                // Validate discount range (0-100)
+                if (clientDto.DiscountLevel < 0 || clientDto.DiscountLevel > 100)
+                    return BadRequest("Discount must be between 0 and 100");
+
+                client.DiscountLevel = clientDto.DiscountLevel.Value;
+            }
+
             try
             {
-                await PutClient(id, clientDto);
-                return Ok();
+                await _context.SaveChangesAsync();
+                return NoContent(); // Standard response for successful PUT
             }
-            catch (DivideByZeroException)
+            catch (DbUpdateConcurrencyException ex)
             {
-                return NotFound();
+                if (!ClientExists(id))
+                    return NotFound($"Client with ID {id} no longer exists");
+
+                return Conflict("The client was modified by another user. Please refresh and try again.");
             }
-            catch
+            catch (Exception ex)
             {
-                return Problem();
+                return StatusCode(500, "An error occurred while updating the client");
             }
         }
 
+        private bool ClientExists(int id)
+        {
+            return _context.Clients.Any(e => e.Id == id);
+        }
         // POST: api/Clients
         [HttpPost]
         public async Task <ActionResult<ClientResponseDto>> Create([FromBody] ClientCreateDto clientDto)

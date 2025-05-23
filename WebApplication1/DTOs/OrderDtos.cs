@@ -86,4 +86,46 @@ namespace WebApplication1
             _ => "Normal"
         };
     }
+    public class OrderProfitDto
+    {
+        public int OrderId { get; set; }
+        public decimal TotalSellingPrice { get; set; }
+        public decimal TotalActualCost { get; set; }
+        public decimal DiscountAmount { get; set; }
+        public decimal ProfitBeforeDiscount { get; set; }
+        public decimal FinalProfit { get; set; }
+        public decimal ProfitMargin { get; set; } // Percentage
+    }
+    public class OrderFlowerValidationResult
+    {
+        public int OrderId { get; set; }
+        public bool IsValid { get; set; }
+        public List<FlowerStockStatus> FlowerStatuses { get; set; }
+    }
+
+    public class FlowerStockStatus
+    {
+        public int FlowerId { get; set; }
+        public string FlowerName { get; set; }
+        public int RequiredQuantity { get; set; }
+        public int AvailableQuantity { get; set; }
+        public bool IsAvailable { get; set; }
+    }
+    public class OrderValidationResult
+    {
+        public int OrderId { get; set; }
+        public bool IsValid { get; set; }
+        public List<MaterialStatus> FlowerStatuses { get; set; }
+        public List<MaterialStatus> IngredientStatuses { get; set; }
+        public List<MaterialStatus> BoxStatuses { get; set; }
+    }
+
+    public class MaterialStatus
+    {
+        public int MaterialId { get; set; }
+        public string MaterialName { get; set; }
+        public int RequiredQuantity { get; set; }
+        public int AvailableQuantity { get; set; }
+        public bool IsAvailable { get; set; }
+    }
 }

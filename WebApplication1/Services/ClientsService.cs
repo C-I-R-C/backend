@@ -62,37 +62,7 @@ namespace WebApplication1.Services
             return client;
             
         }
-        public async Task<ClientWithOrdersDto> GetClientWithOrders(int id)
-        {
-            var client = await _context.Clients
-                .Where(c => c.Id == id)
-                .Select(c => new ClientWithOrdersDto
-                {
-                    Id = c.Id,
-                    Name = c.Name,
-                    PhoneNumber = c.PhoneNumber,
-                    TotalOrdersCount = c.TotalOrdersCount,
-                    DiscountLevel = c.DiscountLevel,
-                    Orders = _context.Orders
-                        .Where(o => o.ClientId == c.Id)
-                        .Select(o => new OrderSummaryDto
-                        {
-                            Id = o.Id,
-                            OrderDate = o.OrderDate,
-                            TotalPrice = o.TotalPrice,
-                            IsCurrent = o.IsCurrent
-                        })
-                        .ToList()
-                })
-                .FirstOrDefaultAsync();
-
-            if (client == null)
-            {
-                throw new DivideByZeroException();
-            }
-
-            return client;
-        }
+        
         public async Task PutClient(int id, ClientUpdateDto clientDto)
         {
             var client = await _context.Clients.FindAsync(id);

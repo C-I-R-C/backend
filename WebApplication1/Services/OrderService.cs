@@ -373,5 +373,75 @@ namespace WebApplication1.Services
                 })
                 .ToListAsync();
         }
+        public async Task<OrderProfitDto> CalculateOrderProfit(int orderId)
+        {
+            // Get the order with all related data
+            var order = await _context.Orders
+                .Include(o => o.Client)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Item)
+                        .ThenInclude(i => i.ItemFlowers)
+                            .ThenInclude(itemf => itemf.Flower)
+                        .ThenInclude(f => f.FlowerIngredients)
+                            .ThenInclude(fi => fi.Ingredient)
+        .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.Item)
+                .ThenInclude(i => i.Box)
+        .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                throw new KeyNotFoundException("Order not found");
+
+            var result = new OrderProfitDto
+            {
+                OrderId = orderId,
+                TotalSellingPrice = order.TotalPrice
+            };
+
+            // Calculate total actual cost
+            foreach (var orderItem in order.OrderItems)
+            {
+                var item = orderItem.Item;
+                decimal itemCost = 0;
+
+                // Calculate flowers cost
+                foreach (var itemFlower in item.ItemFlowers)
+                {
+                    var flower = itemFlower.Flower;
+                    itemCost += flower.CostPerUnit * itemFlower.Quantity * orderItem.Quantity;
+
+                    // Calculate ingredients cost for each flower
+                    foreach (var flowerIngredient in flower.FlowerIngredients)
+                    {
+                        itemCost += flowerIngredient.Ingredient.CostPerUnit *
+                                   flowerIngredient.QuantityRequired *
+                                   itemFlower.Quantity *
+                                   orderItem.Quantity;
+                    }
+                }
+
+                // Add box cost if exists
+                if (item.Box != null)
+                {
+                    itemCost += item.Box.CostPerUnit * orderItem.Quantity;
+                }
+
+                result.TotalActualCost += itemCost;
+            }
+
+            // Calculate discount (if any)
+            decimal discountRate = order.Client?.DiscountLevel / 100m ?? 0;
+            result.DiscountAmount = result.TotalSellingPrice * discountRate;
+
+            // Calculate profits
+            result.ProfitBeforeDiscount = result.TotalSellingPrice - result.TotalActualCost;
+            result.FinalProfit = result.ProfitBeforeDiscount - result.DiscountAmount;
+
+            // Calculate profit margin (avoid division by zero)
+            result.ProfitMargin = result.TotalActualCost > 0 ?
+                (result.FinalProfit / result.TotalActualCost) * 100 : 0;
+
+            return result;
+        }
     }
 }
