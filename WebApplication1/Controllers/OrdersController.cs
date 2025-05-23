@@ -227,7 +227,6 @@ namespace WebApplication1.Controllers
 
                 var (flowerRequirements, ingredientRequirements, boxRequirements) = CalculateRequirements(order);
 
-                // Validate all materials and update result
                 result = await ValidateAllMaterialsAsync(
                     flowerRequirements,
                     ingredientRequirements,

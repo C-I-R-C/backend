@@ -420,7 +420,6 @@ namespace WebApplication1.Services
                     }
                 }
 
-                // Add box cost if exists
                 if (item.Box != null)
                 {
                     itemCost += item.Box.CostPerUnit * orderItem.Quantity;
@@ -429,15 +428,12 @@ namespace WebApplication1.Services
                 result.TotalActualCost += itemCost;
             }
 
-            // Calculate discount (if any)
             decimal discountRate = order.Client?.DiscountLevel / 100m ?? 0;
             result.DiscountAmount = result.TotalSellingPrice * discountRate;
 
-            // Calculate profits
             result.ProfitBeforeDiscount = result.TotalSellingPrice - result.TotalActualCost;
             result.FinalProfit = result.ProfitBeforeDiscount - result.DiscountAmount;
-
-            // Calculate profit margin (avoid division by zero)
+            result.FinalProfit = result.FinalProfit * Convert.ToDecimal(0.7);
             result.ProfitMargin = result.TotalActualCost > 0 ?
                 (result.FinalProfit / result.TotalActualCost) * 100 : 0;
 
