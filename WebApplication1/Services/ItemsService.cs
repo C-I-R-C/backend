@@ -163,7 +163,7 @@ namespace WebApplication1.Services
             var isUsedInOrders = await _context.OrderItems.AnyAsync(oi => oi.ItemId == id);
             if (isUsedInOrders)
             {
-                throw new DivideByZeroException();
+                throw new AbandonedMutexException();
             }
 
             _context.Items.Remove(item);

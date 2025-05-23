@@ -24,14 +24,12 @@ namespace WebApplication1.Controllers
             _ingredientsService = ingredientsService;
         }
 
-        // GET: api/Ingredients1
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Ingredient>>> GetIngredients()
         {
             return await _context.Ingredients.ToListAsync();
         }
 
-        // GET: api/Ingredients1/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Ingredient>> GetIngredient(int id)
         {
@@ -44,9 +42,6 @@ namespace WebApplication1.Controllers
 
             return ingredient;
         }
-
-        // PUT: api/Ingredients1/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
         public async Task<IActionResult> PutIngredient(int id, Ingredient ingredient)
         {
@@ -64,8 +59,6 @@ namespace WebApplication1.Controllers
             }
         }
 
-        // POST: api/Ingredients1
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
         public async Task <ActionResult<IngredientDto>> Create([FromBody] IngredientCreateDto dto)
         {
@@ -77,16 +70,47 @@ namespace WebApplication1.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteIngredient(int id)
         {
-            var ingredient = await _context.Ingredients.FindAsync(id);
-            if (ingredient == null)
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
             {
-                return NotFound();
+                // Check if ingredient exists
+                var ingredient = await _context.Ingredients.FindAsync(id);
+                if (ingredient == null)
+                {
+                    return NotFound($"Ingredient with ID {id} not found");
+                }
+                var isUsedInFlowers = await _context.FlowerIngredients
+                    .AnyAsync(fi => fi.IngredientId == id);
+
+                if (isUsedInFlowers)
+                {
+                    var flowerNames = await _context.FlowerIngredients
+                        .Where(fi => fi.IngredientId == id)
+                        .Include(fi => fi.Flower)
+                        .Select(fi => fi.Flower.Name)
+                        .ToListAsync();
+
+                    return BadRequest(new
+                    {
+                        Message = "Cannot delete ingredient used in flowers",
+                        Flowers = flowerNames,
+                        Count = flowerNames.Count
+                    });
+                }
+
+                // Safe to delete
+                _context.Ingredients.Remove(ingredient);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return NoContent();
             }
-
-            _context.Ingredients.Remove(ingredient);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, "An error occurred while deleting ingredient");
+            }
         }
         [HttpGet("low-stock")]
         public async Task<ActionResult<List<IngredientStockDto>>> GetLowStockIngredients(
@@ -94,7 +118,6 @@ namespace WebApplication1.Controllers
         {
             try
             {
-                // Validate input
                 if (count < 1 || count > 50)
                 {
                     return BadRequest("Count must be between 1 and 50");

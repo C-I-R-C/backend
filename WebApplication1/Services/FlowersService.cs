@@ -147,9 +147,8 @@ namespace WebApplication1.Services
                 if (updateDto.IsIncrement)
                 {
                     // Increase flower stock
-                    flower.InStock += updateDto.Quantity;
-
-                    // Decrease ingredient stocks
+                    
+                    
                     foreach (var flowerIngredient in flower.FlowerIngredients)
                     {
                         var ingredient = flowerIngredient.Ingredient;
@@ -164,6 +163,7 @@ namespace WebApplication1.Services
 
                         ingredient.InStock -= quantityToDeduct;
                     }
+                    flower.InStock += updateDto.Quantity;
                 }
                 else
                 {

@@ -141,6 +141,49 @@ namespace WebApplication1.Services
         {
             return _context.FlowerIngredients.Any(e => e.FlowerId == id);
         }
+        public async Task RemoveIngredientFromFlower(int flowerId, int ingredientId)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                // Verify flower exists
+                var flower = await _context.Flowers
+                    .Include(f => f.FlowerIngredients)
+                    .FirstOrDefaultAsync(f => f.Id == flowerId);
+
+                if (flower == null)
+                {
+                    throw new DivideByZeroException();
+                }
+
+                // Find the ingredient relationship
+                var flowerIngredient = await _context.FlowerIngredients
+                    .FirstOrDefaultAsync(fi => fi.FlowerId == flowerId && fi.IngredientId == ingredientId);
+
+                if (flowerIngredient == null)
+                {
+                    throw new DivideByZeroException();
+                }
+
+                // Remove the relationship
+                _context.FlowerIngredients.Remove(flowerIngredient);
+
+                // Recalculate flower cost
+                flower.CostPerUnit = await _context.FlowerIngredients
+                    .Where(fi => fi.FlowerId == flowerId)
+                    .SumAsync(fi => fi.Ingredient.CostPerUnit * fi.QuantityRequired);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+                
+            }
+        }
     }
     
 }

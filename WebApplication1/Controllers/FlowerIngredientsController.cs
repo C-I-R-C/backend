@@ -28,9 +28,20 @@ namespace WebApplication1.Controllers
 
         // GET: api/FlowerIngredients1
         [HttpGet]
-        public async Task <ActionResult<IEnumerable<FlowerIngredientDto>>> GetIngredientsForFlower(int flowerId)
+        public async Task<ActionResult<IEnumerable<FlowerIngredientDto>>> GetIngredientsForFlower(int flowerId)
         {
-            return await _flowerIngredientsService.GetIngredientsForFlower(flowerId);
+            try
+            {
+                return await _flowerIngredientsService.GetIngredientsForFlower(flowerId);
+            }
+            catch (DivideByZeroException)
+            {
+                return NotFound("flower not found");
+            }
+            catch
+            {
+                return Problem();
+            }
         }
 
         // GET: api/FlowerIngredients1/5
@@ -75,7 +86,7 @@ namespace WebApplication1.Controllers
             }
         }
         [HttpPost]
-        public async Task <ActionResult<FlowerIngredientDto>> AddIngredientToFlower(
+        public async Task<ActionResult<FlowerIngredientDto>> AddIngredientToFlower(
             int flowerId, [FromBody] AddIngredientToFlowerDto dto)
         {
             try
@@ -115,6 +126,29 @@ namespace WebApplication1.Controllers
             {
                 return Problem();
             }
-        } 
+        }
+        [HttpDelete("{flowerId}/ingredients/{ingredientId}")]
+        public async Task<IActionResult> RemoveIngredientFromFlower(
+    int flowerId,
+    int ingredientId)
+        { 
+            try
+            {
+                await _flowerIngredientsService.RemoveIngredientFromFlower(flowerId, ingredientId);
+                return Ok();
+            }
+            catch (DivideByZeroException)
+            {
+                return NotFound();
+            }
+            catch (BadImageFormatException)
+            {
+                return NotFound("No such flower");
+            }
+            catch
+            {
+                return Problem();
+            }
+        }
     }
 }

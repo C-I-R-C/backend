@@ -13,23 +13,20 @@ namespace WebApplication1.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class Colors1Controller : ControllerBase
+    public class ColorsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
 
-        public Colors1Controller(ApplicationDbContext context)
+        public ColorsController(ApplicationDbContext context)
         {
             _context = context;
         }
-
-        // GET: api/Colors1
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Color>>> GetColors()
         {
             return await _context.Colors.ToListAsync();
         }
 
-        // GET: api/Colors1/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Color>> GetColor(int id)
         {
@@ -43,8 +40,6 @@ namespace WebApplication1.Controllers
             return color;
         }
 
-        // PUT: api/Colors1/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
         public async Task<IActionResult> PutColor(int id, Color color)
         {
@@ -73,9 +68,6 @@ namespace WebApplication1.Controllers
 
             return NoContent();
         }
-
-        // POST: api/Colors1
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
         public async Task <ActionResult<ColorDto>> Create([FromBody] ColorCreateDto colorDto)
         {
@@ -95,8 +87,6 @@ namespace WebApplication1.Controllers
                     IsNatural = color.IsNatural
                 });
         }
-
-        // DELETE: api/Colors1/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteColor(int id)
         {
@@ -105,7 +95,11 @@ namespace WebApplication1.Controllers
             {
                 return NotFound();
             }
-
+            var isUsedInFlowers = await _context.Flowers.AnyAsync(oi => oi.ColorId == id);
+            if (isUsedInFlowers)
+            {
+                return BadRequest("Color used in flower");
+            }
             _context.Colors.Remove(color);
             await _context.SaveChangesAsync();
 
@@ -116,5 +110,6 @@ namespace WebApplication1.Controllers
         {
             return _context.Colors.Any(e => e.Id == id);
         }
+
     }
 }

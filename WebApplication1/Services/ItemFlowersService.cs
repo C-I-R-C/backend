@@ -1,5 +1,6 @@
 ﻿using System.Security.AccessControl;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WebApplication1.Models;
 
 namespace WebApplication1.Services
@@ -109,14 +110,29 @@ namespace WebApplication1.Services
 
         public async Task RemoveFlowerFromItem(int itemId, int flowerId)
         {
-            var itemFlower = _data.ItemFlowers
-                .FirstOrDefault(itemf => itemf.ItemId == itemId && itemf.FlowerId == flowerId);
+            using var transaction = await _data.Database.BeginTransactionAsync();
 
-            if (itemFlower == null)
-                throw new DivideByZeroException();
+            try
+            {
+                // Find the relationship
+                var itemFlower = await _data.ItemFlowers
+                    .FirstOrDefaultAsync(itemf => itemf.ItemId == itemId && itemf.FlowerId == flowerId);
 
-            _data.ItemFlowers.Remove(itemFlower);
-            await _data.SaveChangesAsync();
+                if (itemFlower == null)
+                {
+                    throw new KeyNotFoundException($"Flower {flowerId} not found in item {itemId}");
+                }
+
+                // Remove the relationship
+                _data.ItemFlowers.Remove(itemFlower);
+                await _data.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+                throw; // Re-throw for controller to handle
+            }
         }
     }
 }

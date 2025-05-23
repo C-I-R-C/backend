@@ -98,6 +98,10 @@ namespace WebApplication1.Controllers
             {
                 return BadRequest("Item not found");
             }
+            catch (AbandonedMutexException)
+            {
+                return BadRequest("Item is used in order");
+            }
             catch
             {
                 return Problem();

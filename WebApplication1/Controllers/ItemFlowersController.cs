@@ -69,21 +69,21 @@ namespace WebApplication1.Controllers
         }
 
         // DELETE api/items/5/flowers/3
-        [HttpDelete("{flowerId}")]
-        public async Task <IActionResult> RemoveFlowerFromItem(int itemId, int flowerId)
+        [HttpDelete("{itemId}/flowers/{flowerId}")]
+        public async Task<IActionResult> RemoveFlowerFromItem(int itemId, int flowerId)
         {
             try
             {
-                await RemoveFlowerFromItem(itemId, flowerId);
-                return Ok();
+                await _itemFlowersService.RemoveFlowerFromItem(itemId, flowerId);
+                return NoContent();
             }
-            catch (DivideByZeroException)
+            catch (KeyNotFoundException ex)
             {
-                return BadRequest("Item or flower not found");
+                return NotFound(ex.Message);
             }
-            catch
+            catch (Exception ex)
             {
-                return Problem();
+                return StatusCode(500, "Error removing flower from item");
             }
         }
     }
