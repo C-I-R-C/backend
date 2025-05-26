@@ -15,12 +15,10 @@ namespace WebApplication1.Controllers
     [ApiController]
     public class ItemsController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
         private readonly ItemsService _itemsService;
 
-        public ItemsController(ApplicationDbContext context, ItemsService itemsService)
+        public ItemsController(ItemsService itemsService)
         {
-            _context = context;
             _itemsService = itemsService;
         }
 

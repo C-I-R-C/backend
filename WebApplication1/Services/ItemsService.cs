@@ -104,7 +104,7 @@ namespace WebApplication1.Services
         }
         public async Task<Item> PostItem(ItemCreateDto itemDto)
         {
-            if (itemDto.BoxId != null && !await _context.Boxes.AnyAsync(b => b.Id == itemDto.BoxId))
+            if (!await _context.Boxes.AnyAsync(b => b.Id == itemDto.BoxId))
             {
                 throw new DivideByZeroException();
             }
@@ -113,14 +113,14 @@ namespace WebApplication1.Services
             {
                 Name = itemDto.Name,
                 BasePrice = itemDto.BasePrice,
-                BoxId = itemDto.BoxId // Only set the foreign key
+                BoxId = itemDto.BoxId
 
             };
 
             _context.Items.Add(item);
             await _context.SaveChangesAsync();
 
-            // Load the box if you need it in the response
+
             if (item.BoxId.HasValue)
             {
                 await _context.Entry(item)
@@ -138,7 +138,6 @@ namespace WebApplication1.Services
                 throw new DivideByZeroException();
             }
 
-            // Check if item is used in any orders
             var isUsedInOrders = await _context.OrderItems.AnyAsync(oi => oi.ItemId == id);
             if (isUsedInOrders)
             {
@@ -151,7 +150,6 @@ namespace WebApplication1.Services
         }
         public async Task<ItemCostAnalysisDto> CalculateItemCostAnalysis(int itemId)
         {
-            // Get the item with all related data
             var item = await _context.Items
                 .Include(i => i.ItemFlowers)
                     .ThenInclude(itemf => itemf.Flower)

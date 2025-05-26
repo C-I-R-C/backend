@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1;
 using WebApplication1.Models;
+using WebApplication1.Services;
 
 namespace WebApplication1.Controllers
 {
@@ -15,100 +16,78 @@ namespace WebApplication1.Controllers
     [ApiController]
     public class ColorsController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly ColorsService _colorsService;
 
-        public ColorsController(ApplicationDbContext context)
+        public ColorsController(ColorsService colorsService)
         {
-            _context = context;
+            _colorsService = colorsService;
         }
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Color>>> GetColors()
+        public async Task<IEnumerable<Color>> GetColors()
         {
-            return await _context.Colors.ToListAsync();
+            return await _colorsService.GetColors();
         }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<Color>> GetColor(int id)
         {
-            var color = await _context.Colors.FindAsync(id);
-
-            if (color == null)
+            try
             {
-                return NotFound();
+                return await _colorsService.GetColor(id);
             }
-
-            return color;
+            catch (DivideByZeroException)
+            {
+                return BadRequest("Color not found");
+            }
+            catch 
+            {
+                return Problem();
+            }
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> PutColor(int id, Color color)
         {
-            if (id != color.Id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(color).State = EntityState.Modified;
-
             try
             {
-                await _context.SaveChangesAsync();
+                await _colorsService.PutColor(id, color);
+                return Ok();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DivideByZeroException)
             {
-                if (!ColorExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                return BadRequest("invalid Id");
+            }
+            catch
+            {
+                return Problem();
             }
 
-            return NoContent();
         }
         [HttpPost]
         public async Task <ActionResult<ColorDto>> Create([FromBody] ColorCreateDto colorDto)
         {
-            var color = new Color
-            {
-                Name = colorDto.Name,
-                IsNatural = colorDto.IsNatural
-            };
-
-            _context.Colors.Add(color);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetColor), new { id = color.Id },
-                new ColorDto
-                {
-                    Id = color.Id,
-                    Name = color.Name,
-                    IsNatural = color.IsNatural
-                });
+            return await _colorsService.Create(colorDto);
         }
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteColor(int id)
         {
-            var color = await _context.Colors.FindAsync(id);
-            if (color == null)
+            try
             {
-                return NotFound();
+                await _colorsService.DeleteColor(id);
+                return Ok();
             }
-            var isUsedInFlowers = await _context.Flowers.AnyAsync(oi => oi.ColorId == id);
-            if (isUsedInFlowers)
+            catch (DivideByZeroException)
             {
-                return BadRequest("Color used in flower");
+                return BadRequest("No such color");
             }
-            _context.Colors.Remove(color);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        private bool ColorExists(int id)
-        {
-            return _context.Colors.Any(e => e.Id == id);
+            catch (ArgumentException)
+            {
+                return BadRequest("Already used in flower");
+            }
+            catch
+            {
+                return Problem();
+            }
         }
 
     }

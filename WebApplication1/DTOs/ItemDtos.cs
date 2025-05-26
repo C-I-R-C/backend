@@ -7,23 +7,23 @@ namespace WebApplication1
     public class ItemDto
     {
         public int Id { get; set; }
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public decimal BasePrice { get; set; }
     }
 
     public class ItemResponseDto
     {
         public int Id { get; set; }
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public decimal BasePrice { get; set; }
-        public BoxDto Box { get; set; }
+        public BoxDto? Box { get; set; }
         public List<ItemFlowerDetailDto> Flowers { get; set; } = new();
         public decimal ProductionCost { get; set; }
     }
 
     public class ItemCreateDto
     {
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public decimal BasePrice { get; set; }
         public int BoxId { get; set; }
     }
@@ -31,7 +31,7 @@ namespace WebApplication1
     public class ItemUpdateDto
     {
         public int Id { get; set; }
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public decimal BasePrice { get; set; }
     }
     public class ItemFlowerDto
@@ -39,23 +39,23 @@ namespace WebApplication1
         public int ItemId { get; set; }
         public int FlowerId { get; set; }
         public int Quantity { get; set; }
-        public FlowerDto Flower { get; set; }
+        public FlowerDto? Flower { get; set; }
     }
 
     public class ItemFlowerDetailDto
     {
         public int FlowerId { get; set; }
-        public string FlowerName { get; set; }
+        public string? FlowerName { get; set; }
         public int Quantity { get; set; }
         public decimal UnitCost { get; set; }
-        public string Color { get; set; }
+        public string? Color { get; set; }
         public List<FlowerIngredient1Dto> Ingredients { get; set; } = new();
     }
 
     public class ItemFlowerUsageDto
     {
         public int ItemId { get; set; }
-        public string ItemName { get; set; }
+        public string? ItemName { get; set; }
         public int QuantityInItem { get; set; }
         public int ItemQuantity { get; set; }
     }

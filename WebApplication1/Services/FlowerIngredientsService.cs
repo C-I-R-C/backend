@@ -77,53 +77,53 @@ namespace WebApplication1.Services
             }
         }
 
-        public async Task<ActionResult<FlowerIngredientDto>> AddIngredientToFlower(
-            int flowerId, [FromBody] AddIngredientToFlowerDto dto)
-        {
-            if (!_context.Flowers.Any(f => f.Id == flowerId))
-                throw new DivideByZeroException();
+        //public async Task<ActionResult<FlowerIngredientDto>> AddIngredientToFlower(
+        //    int flowerId, [FromBody] AddIngredientToFlowerDto dto)
+        //{
+        //    if (!_context.Flowers.Any(f => f.Id == flowerId))
+        //        throw new DivideByZeroException();
 
-            if (!_context.Ingredients.Any(i => i.Id == dto.IngredientId))
-                throw new DivideByZeroException();
-            var flower = await _context.Flowers
-                .Include(f => f.FlowerIngredients)
-                .ThenInclude(fi => fi.Ingredient)
-                .FirstOrDefaultAsync(f => f.Id == flowerId);
-            var existing = _context.FlowerIngredients
-                .FirstOrDefault(fi => fi.FlowerId == flowerId && fi.IngredientId == dto.IngredientId);
+        //    if (!_context.Ingredients.Any(i => i.Id == dto.IngredientId))
+        //        throw new DivideByZeroException();
+        //    var flower = await _context.Flowers
+        //        .Include(f => f.FlowerIngredients)
+        //        .ThenInclude(fi => fi.Ingredient)
+        //        .FirstOrDefaultAsync(f => f.Id == flowerId);
+        //    var existing = _context.FlowerIngredients
+        //        .FirstOrDefault(fi => fi.FlowerId == flowerId && fi.IngredientId == dto.IngredientId);
 
-            if (existing != null)
-            {
-                existing.QuantityRequired = dto.QuantityRequired;
-            }
-            else
-            {
-                _context.FlowerIngredients.Add(new FlowerIngredient
-                {
-                    FlowerId = flowerId,
-                    IngredientId = dto.IngredientId,
-                    QuantityRequired = dto.QuantityRequired
-                });
-            }
+        //    if (existing != null)
+        //    {
+        //        existing.QuantityRequired = dto.QuantityRequired;
+        //    }
+        //    else
+        //    {
+        //        _context.FlowerIngredients.Add(new FlowerIngredient
+        //        {
+        //            FlowerId = flowerId,
+        //            IngredientId = dto.IngredientId,
+        //            QuantityRequired = dto.QuantityRequired
+        //        });
+        //    }
 
-            var ingredient = _context.Ingredients.First(i => i.Id == dto.IngredientId);
-            flower.CostPerUnit = flower.CostPerUnit + ingredient.CostPerUnit * existing.QuantityRequired;
-            await _context.SaveChangesAsync();
-            return 
-                new FlowerIngredientDto
-                {
-                    FlowerId = flowerId,
-                    IngredientId = dto.IngredientId,
-                    QuantityRequired = dto.QuantityRequired,
-                    Ingredient = new IngredientDto
-                    {
-                        Id = ingredient.Id,
-                        Name = ingredient.Name,
-                        InStock = ingredient.InStock,
-                        CostPerUnit = ingredient.CostPerUnit
-                    }
-                };
-        }
+        //    var ingredient = _context.Ingredients.First(i => i.Id == dto.IngredientId);
+        //    flower.CostPerUnit = flower.CostPerUnit + ingredient.CostPerUnit * existing.QuantityRequired;
+        //    await _context.SaveChangesAsync();
+        //    return 
+        //        new FlowerIngredientDto
+        //        {
+        //            FlowerId = flowerId,
+        //            IngredientId = dto.IngredientId,
+        //            QuantityRequired = dto.QuantityRequired,
+        //            Ingredient = new IngredientDto
+        //            {
+        //                Id = ingredient.Id,
+        //                Name = ingredient.Name,
+        //                InStock = ingredient.InStock,
+        //                CostPerUnit = ingredient.CostPerUnit
+        //            }
+        //        };
+        //}
         
         public async Task DeleteFlowerIngredient(int id)
         {
@@ -140,6 +140,69 @@ namespace WebApplication1.Services
         private bool FlowerIngredientExists(int id)
         {
             return _context.FlowerIngredients.Any(e => e.FlowerId == id);
+        }
+        public async Task<FlowerIngredientDto> AddIngredientToFlower(
+    int flowerId, [FromBody] AddIngredientToFlowerDto dto)
+        {
+            if (dto.QuantityRequired <= 0)
+                throw new ArgumentException();
+
+            var flower = await _context.Flowers
+                .Include(f => f.FlowerIngredients)
+                .ThenInclude(fi => fi.Ingredient)
+                .FirstOrDefaultAsync(f => f.Id == flowerId);
+
+            if (flower == null)
+                throw new DivideByZeroException();
+
+            var ingredient = await _context.Ingredients
+                .FirstOrDefaultAsync(i => i.Id == dto.IngredientId);
+
+            if (ingredient == null)
+                throw new DivideByZeroException();
+            var existing = flower.FlowerIngredients
+                .FirstOrDefault(fi => fi.IngredientId == dto.IngredientId);
+
+            decimal costChange = 0;
+
+            if (existing != null)
+            {
+                costChange = ingredient.CostPerUnit *
+                            (dto.QuantityRequired - existing.QuantityRequired);
+                existing.QuantityRequired = dto.QuantityRequired;
+            }
+            else
+            {
+                costChange = ingredient.CostPerUnit * dto.QuantityRequired;
+
+                var newFlowerIngredient = new FlowerIngredient
+                {
+                    FlowerId = flowerId,
+                    IngredientId = dto.IngredientId,
+                    QuantityRequired = dto.QuantityRequired
+                };
+
+                _context.FlowerIngredients.Add(newFlowerIngredient);
+                flower.FlowerIngredients.Add(newFlowerIngredient);
+            }
+
+            flower.CostPerUnit += costChange;
+
+            await _context.SaveChangesAsync();
+
+            return new FlowerIngredientDto
+            {
+                FlowerId = flowerId,
+                IngredientId = dto.IngredientId,
+                QuantityRequired = dto.QuantityRequired,
+                Ingredient = new IngredientDto
+                {
+                    Id = ingredient.Id,
+                    Name = ingredient.Name,
+                    InStock = ingredient.InStock,
+                    CostPerUnit = ingredient.CostPerUnit
+                }
+            };
         }
         public async Task RemoveIngredientFromFlower(int flowerId, int ingredientId)
         {

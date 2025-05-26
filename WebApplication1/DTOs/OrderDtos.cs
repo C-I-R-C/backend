@@ -18,8 +18,8 @@ namespace WebApplication1
         public DateTime OrderDate { get; set; }
         public decimal TotalPrice { get; set; }
         public bool IsCurrent { get; set; }
-        public string Comment { get; set; }
-        public ClientInfoDto Client { get; set; }
+        public string? Comment { get; set; }
+        public ClientInfoDto? Client { get; set; }
         public List<OrderItemDto> Items { get; set; } = new();
     }
 
@@ -27,13 +27,13 @@ namespace WebApplication1
     {
         public int ClientId { get; set; }
         public DateTime? OrderCompleteDate { get; set; }
-        public string Comment { get; set; }
+        public string? Comment { get; set; }
         public List<OrderItemDto> Items { get; set; } = new();
     }
 
     public class OrderUpdateDto
     {
-        public string Comment { get; set; }
+        public string? Comment { get; set; }
         public bool? IsCurrent { get; set; }
         public DateTime? OrderCompleteDate { get; set; }
     }
@@ -45,9 +45,9 @@ namespace WebApplication1
         public DateTime OrderCompleteDate { get; set; }
         public decimal TotalPrice { get; set; }
         public bool IsCurrent { get; set; }
-        public string Comment { get; set; }
-        public ClientInfoDto Client { get; set; }
-        public List<OrderItemWithDetailsDto> Items { get; set; } = new();
+        public string? Comment { get; set; }
+        public ClientInfoDto? Client { get; set; }
+        public List<OrderItemWithDetailsDto> ? Items { get; set; } = new();
         public TimeSpan TimeUntilDue { get; set; }
         public bool IsUrgent => TimeUntilDue.TotalHours < 24;
     }
@@ -56,7 +56,7 @@ namespace WebApplication1
     {
         public int OrderId { get; set; }
         public DateTime OrderDate { get; set; }
-        public string ClientName { get; set; }
+        public string? ClientName { get; set; }
         public List<FlowerUsageDto> Flowers { get; set; } = new();
     }
     public class OrderQueryDto
@@ -73,7 +73,7 @@ namespace WebApplication1
     public class UrgentOrderDto
     {
         public int OrderId { get; set; }
-        public string ClientName { get; set; }
+        public string? ClientName { get; set; }
         public DateTime CompletionDate { get; set; }
         public TimeSpan TimeUntilDue { get; set; }
         public int ItemsCount { get; set; }
@@ -100,13 +100,13 @@ namespace WebApplication1
     {
         public int OrderId { get; set; }
         public bool IsValid { get; set; }
-        public List<FlowerStockStatus> FlowerStatuses { get; set; }
+        public List<FlowerStockStatus>? FlowerStatuses { get; set; }
     }
 
     public class FlowerStockStatus
     {
         public int FlowerId { get; set; }
-        public string FlowerName { get; set; }
+        public string? FlowerName { get; set; }
         public int RequiredQuantity { get; set; }
         public int AvailableQuantity { get; set; }
         public bool IsAvailable { get; set; }
@@ -115,15 +115,15 @@ namespace WebApplication1
     {
         public int OrderId { get; set; }
         public bool IsValid { get; set; }
-        public List<MaterialStatus> FlowerStatuses { get; set; }
-        public List<MaterialStatus> IngredientStatuses { get; set; }
-        public List<MaterialStatus> BoxStatuses { get; set; }
+        public List<MaterialStatus>? FlowerStatuses { get; set; }
+        public List<MaterialStatus>? IngredientStatuses { get; set; }
+        public List<MaterialStatus>? BoxStatuses { get; set; }
     }
 
     public class MaterialStatus
     {
         public int MaterialId { get; set; }
-        public string MaterialName { get; set; }
+        public string? MaterialName { get; set; }
         public int RequiredQuantity { get; set; }
         public int AvailableQuantity { get; set; }
         public bool IsAvailable { get; set; }

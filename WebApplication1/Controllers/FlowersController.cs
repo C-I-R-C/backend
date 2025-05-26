@@ -15,22 +15,18 @@ namespace WebApplication1.Controllers
     [Route("api/[controller]")]
     public class FlowersController : ControllerBase
     {
-        private readonly ApplicationDbContext _data;
         private readonly FlowersService _flowersService;
-        public FlowersController(ApplicationDbContext context, FlowersService flowersService)
+        public FlowersController(FlowersService flowersService)
         {
-            _data = context;
             _flowersService = flowersService;
         }
 
-        // GET api/flowers
         [HttpGet]
         public async Task <ActionResult<IEnumerable<FlowerDto>>> GetAll()
         {
             return await _flowersService.GetAll();
         }
 
-        // GET api/flowers/5
         [HttpGet("{id}")]
         public async  Task <ActionResult<FlowerWithIngredientsDto>> GetById(int id)
         {
@@ -48,14 +44,12 @@ namespace WebApplication1.Controllers
             }
         }
 
-        // POST api/flowers
         [HttpPost]
         public async Task <ActionResult<FlowerDto>> Create([FromBody] FlowerCreateDto flowerDto)
         {
             return await _flowersService.Create(flowerDto);
         }
 
-        // PUT api/flowers/5
         [HttpPut("{id}")]
         public async Task <IActionResult> Update(int id, [FromBody] FlowerUpdateDto flowerDto)
         {
@@ -74,7 +68,6 @@ namespace WebApplication1.Controllers
             }
         }
 
-        // DELETE api/flowers/5
         [HttpDelete("{id}")]
         public async Task <IActionResult> Delete(int id)
         {
@@ -96,6 +89,7 @@ namespace WebApplication1.Controllers
                 return Problem();
             }
         }
+
         [HttpPatch("{id}/quantity")]
         public async Task<ActionResult<FlowerDto>> UpdateQuantity(int id, [FromBody] FlowerQuantityUpdateDto updateDto)
         {
@@ -116,6 +110,7 @@ namespace WebApplication1.Controllers
                 return Problem();
             }
         }
+
         [HttpGet("search")]
         public async Task<ActionResult<List<FlowerDto>>> SearchFlowersByName([FromQuery] string name)
         {
@@ -135,10 +130,9 @@ namespace WebApplication1.Controllers
 
                 return Ok(flowers);
             }
-            catch (Exception ex)
+            catch
             {
-                // Log the exception if needed
-                return StatusCode(500, "An error occurred while processing your request");
+                return Problem();
             }
         }
     }

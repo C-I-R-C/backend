@@ -15,32 +15,34 @@ namespace WebApplication1.Controllers
     [ApiController]
     public class IngredientsController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
         private readonly IngredientsService _ingredientsService;
 
         public IngredientsController(ApplicationDbContext context, IngredientsService ingredientsService)
         {
-            _context = context;
             _ingredientsService = ingredientsService;
         }
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Ingredient>>> GetIngredients()
         {
-            return await _context.Ingredients.ToListAsync();
+            return Ok(await _ingredientsService.GetIngredients());
         }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<Ingredient>> GetIngredient(int id)
         {
-            var ingredient = await _context.Ingredients.FindAsync(id);
-
-            if (ingredient == null)
+            try
             {
-                return NotFound();
+                return Ok(await _ingredientsService.GetIngredient(id));
             }
-
-            return ingredient;
+            catch (ArgumentException)
+            {
+                return NoContent();
+            }
+            catch
+            {
+                return Problem();
+            }
         }
         [HttpPut("{id}")]
         public async Task<IActionResult> PutIngredient(int id, Ingredient ingredient)
@@ -66,50 +68,25 @@ namespace WebApplication1.Controllers
         }
 
 
-        // DELETE: api/Ingredients1/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteIngredient(int id)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
 
             try
             {
-                // Check if ingredient exists
-                var ingredient = await _context.Ingredients.FindAsync(id);
-                if (ingredient == null)
-                {
-                    return NotFound($"Ingredient with ID {id} not found");
-                }
-                var isUsedInFlowers = await _context.FlowerIngredients
-                    .AnyAsync(fi => fi.IngredientId == id);
-
-                if (isUsedInFlowers)
-                {
-                    var flowerNames = await _context.FlowerIngredients
-                        .Where(fi => fi.IngredientId == id)
-                        .Include(fi => fi.Flower)
-                        .Select(fi => fi.Flower.Name)
-                        .ToListAsync();
-
-                    return BadRequest(new
-                    {
-                        Message = "Cannot delete ingredient used in flowers",
-                        Flowers = flowerNames,
-                        Count = flowerNames.Count
-                    });
-                }
-
-                // Safe to delete
-                _context.Ingredients.Remove(ingredient);
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                return NoContent();
+                await _ingredientsService.DeleteIngredient(id);
+                return Ok();
             }
-            catch (Exception)
+            catch(DivideByZeroException)
+            { 
+                return BadRequest(new
+                {
+                    Message = "Cannot delete ingredient used in flowers"
+                });
+            }
+            catch
             {
-                await transaction.RollbackAsync();
-                return StatusCode(500, "An error occurred while deleting ingredient");
+                return Problem();
             }
         }
         [HttpGet("low-stock")]
@@ -149,7 +126,7 @@ namespace WebApplication1.Controllers
             {
                 return BadRequest(ex.Message);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, "Error updating ingredient stock");
             }

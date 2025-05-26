@@ -10,24 +10,17 @@ namespace WebApplication1.Controllers
     [Route("api/[controller]")]
     public class ClientsController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
         private readonly ClientsService _clientService;
-        public ClientsController(ApplicationDbContext context, ClientsService clientsService)
+        public ClientsController(ClientsService clientsService)
         {
-            _context = context;
             _clientService = clientsService;
         }
-
-        // DTO classes
-
-        // GET: api/Clients
         [HttpGet]
         public async Task<ActionResult<List<ClientResponseDto>>> GetClients()
         {
             return await _clientService.GetClients();
         }
 
-        // GET: api/Clients/5
         [HttpGet("{id}")]
         public async Task<ActionResult<ClientResponseDto>> GetClient(int id, bool isWithOrders)
         {
@@ -48,63 +41,39 @@ namespace WebApplication1.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutClient(int id, [FromBody] ClientUpdateDto clientDto)
         {
-            // Validate input
-            if (clientDto == null)
-                return BadRequest("Client data is required");
-
-            if (id != clientDto.Id)
-                return BadRequest("ID mismatch");
-
-            // Find existing client
-            var client = await _context.Clients.FindAsync(id);
-            if (client == null)
-                return NotFound($"Client with ID {id} not found");
-
-            // Update fields if provided
-            if (!string.IsNullOrWhiteSpace(clientDto.Name))
-                client.Name = clientDto.Name.Trim();
-
-            if (!string.IsNullOrWhiteSpace(clientDto.PhoneNumber))
-                client.PhoneNumber = clientDto.PhoneNumber.Trim();
-
-            if (clientDto.DiscountLevel.HasValue)
-            {
-                // Validate discount range (0-100)
-                if (clientDto.DiscountLevel < 0 || clientDto.DiscountLevel > 100)
-                    return BadRequest("Discount must be between 0 and 100");
-
-                client.DiscountLevel = clientDto.DiscountLevel.Value;
-            }
-
             try
             {
-                await _context.SaveChangesAsync();
-                return NoContent(); // Standard response for successful PUT
+                await _clientService.PutClient(id, clientDto);
+                return Ok(); 
             }
-            catch (DbUpdateConcurrencyException ex)
+            catch (DbUpdateConcurrencyException)
             {
-                if (!ClientExists(id))
-                    return NotFound($"Client with ID {id} no longer exists");
+                return NotFound($"Client with ID {id} no longer exists");
 
-                return Conflict("The client was modified by another user. Please refresh and try again.");
             }
-            catch (Exception ex)
+            catch (DivideByZeroException)
+            {
+                return BadRequest("Client not found");
+            }
+            catch (AbandonedMutexException)
+            {
+                return BadRequest("Discount must be between 1 and 100");
+            }
+            catch (ArgumentException)
+            {
+                return BadRequest("ID mismatch");
+            }
+            catch
             {
                 return StatusCode(500, "An error occurred while updating the client");
             }
         }
 
-        private bool ClientExists(int id)
-        {
-            return _context.Clients.Any(e => e.Id == id);
-        }
-        // POST: api/Clients
         [HttpPost]
         public async Task <ActionResult<ClientResponseDto>> Create([FromBody] ClientCreateDto clientDto)
         {
             return await _clientService.Create(clientDto);
         }
-        // DELETE: api/Clients/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteClient(int id)
         {

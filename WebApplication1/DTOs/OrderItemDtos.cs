@@ -15,7 +15,7 @@ namespace WebApplication1
         public int Id { get; set; }
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
-        public ItemDto Item { get; set; }
+        public ItemDto? Item { get; set; }
     }
 
     public class OrderItemWithDetailsDto
@@ -23,7 +23,7 @@ namespace WebApplication1
         public int Id { get; set; }
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
-        public ItemDto Item { get; set; }
+        public ItemDto? Item { get; set; }
         public List<FlowerDetailDto> Flowers { get; set; } = new();
     }
 
@@ -31,7 +31,7 @@ namespace WebApplication1
     {
         public int OrderId { get; set; }
         public int ItemId { get; set; }
-        public string ItemName { get; set; }
+        public string? ItemName { get; set; }
         public int ItemQuantity { get; set; }
         public List<FlowerDetailDto> Flowers { get; set; } = new();
     }

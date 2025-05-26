@@ -63,39 +63,39 @@ namespace WebApplication1.Services
             
         }
         
-        public async Task PutClient(int id, ClientUpdateDto clientDto)
-        {
-            var client = await _context.Clients.FindAsync(id);
-            if (client == null)
-            {
-                throw new DivideByZeroException();
-            }
+        //public async Task PutClient(int id, ClientUpdateDto clientDto)
+        //{
+        //    var client = await _context.Clients.FindAsync(id);
+        //    if (client == null)
+        //    {
+        //        throw new DivideByZeroException();
+        //    }
 
-            if (!string.IsNullOrEmpty(clientDto.Name))
-                client.Name = clientDto.Name;
+        //    if (!string.IsNullOrEmpty(clientDto.Name))
+        //        client.Name = clientDto.Name;
 
-            if (!string.IsNullOrEmpty(clientDto.PhoneNumber))
-                client.PhoneNumber = clientDto.PhoneNumber;
+        //    if (!string.IsNullOrEmpty(clientDto.PhoneNumber))
+        //        client.PhoneNumber = clientDto.PhoneNumber;
 
-            if (clientDto.DiscountLevel.HasValue)
-                client.DiscountLevel = clientDto.DiscountLevel.Value;
+        //    if (clientDto.DiscountLevel.HasValue)
+        //        client.DiscountLevel = clientDto.DiscountLevel.Value;
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!ClientExists(id))
-                {
-                    throw new DivideByZeroException();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-        }
+        //    try
+        //    {
+        //        await _context.SaveChangesAsync();
+        //    }
+        //    catch (DbUpdateConcurrencyException)
+        //    {
+        //        if (!ClientExists(id))
+        //        {
+        //            throw new DivideByZeroException();
+        //        }
+        //        else
+        //        {
+        //            throw;
+        //        }
+        //    }
+        //}
         public async Task<ClientResponseDto> Create([FromBody] ClientCreateDto clientDto)
         {
             var client = new Client
@@ -133,6 +133,33 @@ namespace WebApplication1.Services
             _context.Clients.Remove(client);
             await _context.SaveChangesAsync();
 
+        }
+        public async Task PutClient(int id, [FromBody] ClientUpdateDto clientDto)
+        {
+
+            if (id != clientDto.Id)
+                throw new ArgumentException();
+
+
+            var client = await _context.Clients.FindAsync(id);
+            if (client == null)
+                throw new DivideByZeroException();
+
+            if (!string.IsNullOrWhiteSpace(clientDto.Name))
+                client.Name = clientDto.Name.Trim();
+
+            if (!string.IsNullOrWhiteSpace(clientDto.PhoneNumber))
+                client.PhoneNumber = clientDto.PhoneNumber.Trim();
+
+            if (clientDto.DiscountLevel.HasValue)
+            {
+
+                if (clientDto.DiscountLevel < 0 || clientDto.DiscountLevel > 100)
+                    throw new AbandonedMutexException();
+
+                client.DiscountLevel = clientDto.DiscountLevel.Value;
+            }
+                await _context.SaveChangesAsync();
         }
         private OrderResponseDto MapToOrderResponseDto(Order order)
         {

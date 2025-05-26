@@ -16,22 +16,26 @@ namespace WebApplication1.Controllers
     [ApiController]
     public class ItemFlowersController : ControllerBase
     {
-        private readonly ApplicationDbContext _data;
+
         private readonly ItemFlowersService _itemFlowersService;
-        public ItemFlowersController(ApplicationDbContext context, ItemFlowersService itemFlowersService)
+        public ItemFlowersController(ItemFlowersService itemFlowersService)
         {
-            _data = context;
             _itemFlowersService = itemFlowersService;
         }
 
-        // GET api/items/5/flowers
         [HttpGet]
         public async Task <ActionResult<IEnumerable<ItemFlowerDto>>> GetFlowersForItem(int itemId)
         {
-            return await _itemFlowersService.GetFlowersForItem(itemId);
+            try
+            {
+                return await _itemFlowersService.GetFlowersForItem(itemId);
+            }
+            catch (DivideByZeroException)
+            {
+                return BadRequest("Item not found");
+            }
         }
 
-        // POST api/items/5/flowers
         [HttpPost]
         public async Task <ActionResult<ItemFlowerDto>> AddFlowerToItem(int itemId, [FromBody] AddFlowerToItemDto dto)
         {
@@ -43,13 +47,13 @@ namespace WebApplication1.Controllers
             {
                 return BadRequest("Item or flower not found");
             }
-            //catch
-            //{
-            //    return Problem();
-            //}
+            catch
+            {
+                return Problem();
+            }
         }
 
-        // PUT api/items/5/flowers/3 (update quantity)
+
         [HttpPut("{flowerId}")]
         public async Task <IActionResult> UpdateFlowerQuantity(int itemId, int flowerId, [FromBody] UpdateFlowerQuantityDto dto)
         {
@@ -68,7 +72,6 @@ namespace WebApplication1.Controllers
             }
         }
 
-        // DELETE api/items/5/flowers/3
         [HttpDelete("{itemId}/flowers/{flowerId}")]
         public async Task<IActionResult> RemoveFlowerFromItem(int itemId, int flowerId)
         {
@@ -81,7 +84,7 @@ namespace WebApplication1.Controllers
             {
                 return NotFound(ex.Message);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, "Error removing flower from item");
             }
