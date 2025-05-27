@@ -73,7 +73,6 @@ namespace WebApplication1.Services
                     IsNatural = color.IsNatural
                 };
         }
-        [HttpDelete("{id}")]
         public async Task DeleteColor(int id)
         {
             var color = await _context.Colors.FindAsync(id);

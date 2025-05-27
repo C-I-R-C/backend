@@ -44,7 +44,7 @@ namespace WebApplication1.Services
                     .FirstOrDefault()
             });
 
-            return itemFlowers.ToList();
+            return await itemFlowers.ToListAsync();
         }
         public async Task<ActionResult<ItemFlowerDto>> AddFlowerToItem(int itemId, [FromBody] AddFlowerToItemDto dto)
         {
@@ -123,7 +123,6 @@ namespace WebApplication1.Services
                     throw new KeyNotFoundException($"Flower {flowerId} not found in item {itemId}");
                 }
 
-                // Remove the relationship
                 _data.ItemFlowers.Remove(itemFlower);
                 await _data.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -131,7 +130,7 @@ namespace WebApplication1.Services
             catch (Exception)
             {
                 await transaction.RollbackAsync();
-                throw; // Re-throw for controller to handle
+                throw; 
             }
         }
     }

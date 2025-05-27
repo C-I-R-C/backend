@@ -59,7 +59,7 @@ namespace WebApplication1.Controllers
         {
             try
             {
-                await UpdateFlowerQuantity(itemId, flowerId, dto);
+                await _itemFlowersService.UpdateFlowerQuantity(itemId, flowerId, dto);
                 return Ok();
             }
             catch (DivideByZeroException)
