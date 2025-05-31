@@ -46,7 +46,7 @@ namespace WebApplication1.Services
 
             return await itemFlowers.ToListAsync();
         }
-        public async Task<ActionResult<ItemFlowerDto>> AddFlowerToItem(int itemId, [FromBody] AddFlowerToItemDto dto)
+        public async Task<ItemFlowerDto> AddFlowerToItem(int itemId, [FromBody] AddFlowerToItemDto dto)
         {
             if (!_data.Items.Any(i => i.Id == itemId))
                 throw new DivideByZeroException();

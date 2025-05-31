@@ -29,11 +29,11 @@ namespace WebApplication1.Services
                 } : null
             });
 
-            return flowers.ToList();
+            return await flowers.ToListAsync();
         }
         public async Task<FlowerWithIngredientsDto> GetById(int id)
         {
-            var flower = _data.Flowers.FirstOrDefault(f => f.Id == id);
+            var flower = await _data.Flowers.FirstOrDefaultAsync(f => f.Id == id);
             if (flower == null)
             {
                 throw new DivideByZeroException();
