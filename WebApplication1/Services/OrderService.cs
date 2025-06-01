@@ -41,11 +41,10 @@ namespace WebApplication1.Services
         }
         public async Task<OrderResponseDto> Create([FromBody] OrderCreateDto orderDto)
         {
-            // Validate client exists
+
             var client = _context.Clients.FirstOrDefault(c => c.Id == orderDto.ClientId);
             if (client == null) throw new ArgumentException();
 
-            // Validate all items exist
             foreach (var itemDto in orderDto.Items)
             {
                 if (!_context.Items.Any(i => i.Id == itemDto.ItemId))
@@ -66,18 +65,16 @@ namespace WebApplication1.Services
                     {
                         ItemId = item.Id,
                         Quantity = itemDto.Quantity,
-                        UnitPrice = item.BasePrice // Store price at time of order
+                        UnitPrice = item.BasePrice 
                     };
                 }).ToList()
             };
 
-            // Calculate total with discount
             order.TotalPrice = order.OrderItems.Sum(oi => oi.UnitPrice * oi.Quantity)
                               * (100 - client.DiscountLevel) / 100;
 
             _context.Orders.Add(order);
 
-            // Update client's order count
             client.TotalOrdersCount = _context.Orders.Count(o => o.ClientId == client.Id);
             await _context.SaveChangesAsync();
             return MapToOrderResponseDto(order);
@@ -90,7 +87,6 @@ namespace WebApplication1.Services
                 throw new DivideByZeroException();
             }
 
-            // Only allow updating certain fields
             order.Comment = orderDto.Comment ?? order.Comment;
             order.IsCurrent = orderDto.IsCurrent ?? order.IsCurrent;
 
@@ -112,70 +108,72 @@ namespace WebApplication1.Services
         }
         public async Task<OrderResponseDto> MarkAsCompleted(int id)
         {
-            // Load the order with its items
-            var order = await _context.Orders
-                .Include(o => o.OrderItems)
-                .FirstOrDefaultAsync(o => o.Id == id);
+            using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
-            if (order == null)
+            try
             {
-                throw new KeyNotFoundException($"Order with ID {id} not found");
-            }
+                var order = await _context.Orders
+                    .Include(o => o.OrderItems)
+                    .FirstOrDefaultAsync(o => o.Id == id);
 
-            if (!order.IsCurrent)
-            {
-                throw new InvalidOperationException("Order is already completed");
-            }
-            var itemIds = order.OrderItems.Select(oi => oi.ItemId).ToList();
-
-            var itemsWithFlowers = await _context.Items
-                .Where(i => itemIds.Contains(i.Id))
-                .Include(i => i.ItemFlowers)
-                    .ThenInclude(itemf => itemf.Flower)
-        .ToListAsync();
-
-            // Create a dictionary for quick lookup
-            var itemsDictionary = itemsWithFlowers.ToDictionary(i => i.Id);
-            // Process each order item
-            foreach (var orderItem in order.OrderItems)
-            {
-                if (!itemsDictionary.TryGetValue(orderItem.ItemId, out var item))
+                if (order == null)
                 {
-                    throw new KeyNotFoundException($"Item with ID {orderItem.ItemId} not found");
+                    throw new KeyNotFoundException($"Order with ID {id} not found");
                 }
 
-                foreach (var itemFlower in item.ItemFlowers)
+                if (!order.IsCurrent)
                 {
-                    var flower = itemFlower.Flower;
-                    if (flower == null) continue;
+                    throw new InvalidOperationException("Order is already completed");
+                }
 
-                    var quantityToDeduct = itemFlower.Quantity * orderItem.Quantity;
+                var itemIds = order.OrderItems.Select(oi => oi.ItemId).ToList();
 
-                    if (flower.InStock < quantityToDeduct)
+                var itemsWithFlowers = await _context.Items
+                    .Where(i => itemIds.Contains(i.Id))
+                    .Include(i => i.ItemFlowers)
+                        .ThenInclude(itemf => itemf.Flower)
+                    .ToListAsync();
+
+                var itemsDictionary = itemsWithFlowers.ToDictionary(i => i.Id);
+
+                foreach (var orderItem in order.OrderItems)
+                {
+                    if (!itemsDictionary.TryGetValue(orderItem.ItemId, out var item))
                     {
-                        throw new InvalidOperationException(
-                            $"Not enough stock for flower {flower.Name}. " +
-                            $"Required: {quantityToDeduct}, Available: {flower.InStock}");
+                        throw new KeyNotFoundException($"Item with ID {orderItem.ItemId} not found");
                     }
 
-                    flower.InStock -= quantityToDeduct;
-
-                }
-                if (item.BoxId.HasValue)
-                {
-                    var box = await _context.Boxes.FindAsync(item.BoxId.Value);
-                    if (box != null)
+                    foreach (var itemFlower in item.ItemFlowers)
                     {
-                        box.InStock -= 1;
+                        var flower = itemFlower.Flower;
+                        if (flower == null) continue;
+
+                        var quantityToDeduct = itemFlower.Quantity * orderItem.Quantity;
+
+                        if (flower.InStock < quantityToDeduct)
+                        {
+                            throw new InvalidOperationException(
+                                $"Not enough stock for flower {flower.Name}. " +
+                                $"Required: {quantityToDeduct}, Available: {flower.InStock}");
+                        }
+
+                        flower.InStock -= quantityToDeduct;
                     }
                 }
+
+                order.IsCurrent = false;
+                order.OrderCompleteDate = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return MapToOrderResponseDto(order);
             }
-
-            order.IsCurrent = false;
-            order.OrderCompleteDate = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            return MapToOrderResponseDto(order);
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
         public async Task DeleteOrder(int id)
         {
@@ -267,14 +265,11 @@ namespace WebApplication1.Services
     int pageNumber = 1,
     int pageSize = 20)
         {
-            // 1. Prepare the base query with includes
             var baseQuery = _context.Orders
                 .Include(o => o.Client)
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Item)
                 .AsQueryable();
-
-            // 2. Convert input dates to UTC dates (date-only)
             var utcOrderDate = orderDate.HasValue
                 ? orderDate.Value.Kind == DateTimeKind.Unspecified
                     ? DateTime.SpecifyKind(orderDate.Value.Date, DateTimeKind.Utc)
@@ -287,7 +282,7 @@ namespace WebApplication1.Services
                     : completionDate.Value.Date.ToUniversalTime()
                 : (DateTime?)null;
 
-            // 3. Apply filters with PostgreSQL-compatible date comparison
+
             if (utcOrderDate.HasValue)
             {
                 baseQuery = baseQuery.Where(o =>
@@ -307,10 +302,9 @@ namespace WebApplication1.Services
                 baseQuery = baseQuery.Where(o => o.IsCurrent == !isCompleted.Value);
             }
 
-            // 4. Get total count (before pagination)
+
             var totalCount = await baseQuery.CountAsync();
 
-            // 5. Apply pagination with ordering
             var orders = await baseQuery
     .OrderByDescending(o => o.OrderDate)
     .Skip((pageNumber - 1) * pageSize)
@@ -340,11 +334,9 @@ namespace WebApplication1.Services
                 Name = oi.Item.Name,
                 BasePrice = oi.Item.BasePrice
             } : null
-            // Include other OrderItemWithDetailsDto properties as needed
         }).ToList()
     })
     .ToListAsync();
-            // 6. Return the paged result
             return new PagedResponse<OrderResponseDto>
             {
                 PageNumber = pageNumber,
@@ -358,10 +350,10 @@ namespace WebApplication1.Services
             var now = DateTime.UtcNow;
 
             return await _context.Orders
-                .Where(o => o.IsCurrent) // Only unfinished orders
-                .Where(o => o.OrderCompleteDate > now) // Not yet past due
-                .OrderBy(o => o.OrderCompleteDate) // Orders with closest dates first
-                .Take(count) // Limit results
+                .Where(o => o.IsCurrent)
+                .Where(o => o.OrderCompleteDate > now)
+                .OrderBy(o => o.OrderCompleteDate)
+                .Take(count) 
                 .Select(o => new UrgentOrderDto
                 {
                     OrderId = o.Id,
@@ -375,7 +367,6 @@ namespace WebApplication1.Services
         }
         public async Task<OrderProfitDto> CalculateOrderProfit(int orderId)
         {
-            // Get the order with all related data
             var order = await _context.Orders
                 .Include(o => o.Client)
                 .Include(o => o.OrderItems)
@@ -398,19 +389,16 @@ namespace WebApplication1.Services
                 TotalSellingPrice = order.TotalPrice
             };
 
-            // Calculate total actual cost
             foreach (var orderItem in order.OrderItems)
             {
                 var item = orderItem.Item;
                 decimal itemCost = 0;
 
-                // Calculate flowers cost
                 foreach (var itemFlower in item.ItemFlowers)
                 {
                     var flower = itemFlower.Flower;
                     itemCost += flower.CostPerUnit * itemFlower.Quantity * orderItem.Quantity;
 
-                    // Calculate ingredients cost for each flower
                     foreach (var flowerIngredient in flower.FlowerIngredients)
                     {
                         itemCost += flowerIngredient.Ingredient.CostPerUnit *
@@ -534,7 +522,6 @@ namespace WebApplication1.Services
             result.FlowerStatuses = flowerValidation.statuses;
             if (!flowerValidation.allAvailable) result.IsValid = false;
 
-            // Validate ingredients
             var ingredientValidation = await ValidateMaterialsAsync(
                 ingredientRequirements,
                 _context.Ingredients,
@@ -545,7 +532,6 @@ namespace WebApplication1.Services
             result.IngredientStatuses = ingredientValidation.statuses;
             if (!ingredientValidation.allAvailable) result.IsValid = false;
 
-            // Validate boxes
             var boxValidation = await ValidateMaterialsAsync(
                 boxRequirements,
                 _context.Boxes,

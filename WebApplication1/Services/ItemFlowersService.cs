@@ -114,7 +114,6 @@ namespace WebApplication1.Services
 
             try
             {
-                // Find the relationship
                 var itemFlower = await _data.ItemFlowers
                     .FirstOrDefaultAsync(itemf => itemf.ItemId == itemId && itemf.FlowerId == flowerId);
 
