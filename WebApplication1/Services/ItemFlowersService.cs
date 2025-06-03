@@ -1,5 +1,6 @@
 ﻿using System.Security.AccessControl;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using WebApplication1.Models;
 
 namespace WebApplication1.Services
@@ -43,9 +44,9 @@ namespace WebApplication1.Services
                     .FirstOrDefault()
             });
 
-            return itemFlowers.ToList();
+            return await itemFlowers.ToListAsync();
         }
-        public async Task<ActionResult<ItemFlowerDto>> AddFlowerToItem(int itemId, [FromBody] AddFlowerToItemDto dto)
+        public async Task<ItemFlowerDto> AddFlowerToItem(int itemId, [FromBody] AddFlowerToItemDto dto)
         {
             if (!_data.Items.Any(i => i.Id == itemId))
                 throw new DivideByZeroException();
@@ -109,14 +110,27 @@ namespace WebApplication1.Services
 
         public async Task RemoveFlowerFromItem(int itemId, int flowerId)
         {
-            var itemFlower = _data.ItemFlowers
-                .FirstOrDefault(itemf => itemf.ItemId == itemId && itemf.FlowerId == flowerId);
+            using var transaction = await _data.Database.BeginTransactionAsync();
 
-            if (itemFlower == null)
-                throw new DivideByZeroException();
+            try
+            {
+                var itemFlower = await _data.ItemFlowers
+                    .FirstOrDefaultAsync(itemf => itemf.ItemId == itemId && itemf.FlowerId == flowerId);
 
-            _data.ItemFlowers.Remove(itemFlower);
-            await _data.SaveChangesAsync();
+                if (itemFlower == null)
+                {
+                    throw new KeyNotFoundException($"Flower {flowerId} not found in item {itemId}");
+                }
+
+                _data.ItemFlowers.Remove(itemFlower);
+                await _data.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+                throw; 
+            }
         }
     }
 }

@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
 using WebApplication1.Models;
 
 namespace WebApplication1.Services
@@ -19,7 +18,7 @@ namespace WebApplication1.Services
             if (!_context.Flowers.Any(f => f.Id == flowerId))
                 throw new DivideByZeroException();
 
-            return _context.FlowerIngredients
+            return await _context.FlowerIngredients
                 .Where(fi => fi.FlowerId == flowerId)
                 .Select(fi => new FlowerIngredientDto
                 {
@@ -36,7 +35,7 @@ namespace WebApplication1.Services
                             CostPerUnit = i.CostPerUnit
                         })
                         .FirstOrDefault()
-                }).ToList();
+                }).ToListAsync();
         }
 
         public async Task<ActionResult<FlowerIngredient>> GetFlowerIngredient(int id)
@@ -77,54 +76,6 @@ namespace WebApplication1.Services
             }
         }
 
-        public async Task<ActionResult<FlowerIngredientDto>> AddIngredientToFlower(
-            int flowerId, [FromBody] AddIngredientToFlowerDto dto)
-        {
-            if (!_context.Flowers.Any(f => f.Id == flowerId))
-                throw new DivideByZeroException();
-
-            if (!_context.Ingredients.Any(i => i.Id == dto.IngredientId))
-                throw new DivideByZeroException();
-            var flower = await _context.Flowers
-                .Include(f => f.FlowerIngredients)
-                .ThenInclude(fi => fi.Ingredient)
-                .FirstOrDefaultAsync(f => f.Id == flowerId);
-            var existing = _context.FlowerIngredients
-                .FirstOrDefault(fi => fi.FlowerId == flowerId && fi.IngredientId == dto.IngredientId);
-
-            if (existing != null)
-            {
-                existing.QuantityRequired = dto.QuantityRequired;
-            }
-            else
-            {
-                _context.FlowerIngredients.Add(new FlowerIngredient
-                {
-                    FlowerId = flowerId,
-                    IngredientId = dto.IngredientId,
-                    QuantityRequired = dto.QuantityRequired
-                });
-            }
-
-            var ingredient = _context.Ingredients.First(i => i.Id == dto.IngredientId);
-            flower.CostPerUnit = flower.FlowerIngredients.Sum(fi => fi.Ingredient.CostPerUnit * fi.QuantityRequired);
-            await _context.SaveChangesAsync();
-            return 
-                new FlowerIngredientDto
-                {
-                    FlowerId = flowerId,
-                    IngredientId = dto.IngredientId,
-                    QuantityRequired = dto.QuantityRequired,
-                    Ingredient = new IngredientDto
-                    {
-                        Id = ingredient.Id,
-                        Name = ingredient.Name,
-                        InStock = ingredient.InStock,
-                        CostPerUnit = ingredient.CostPerUnit
-                    }
-                };
-        }
-        
         public async Task DeleteFlowerIngredient(int id)
         {
             var flowerIngredient = await _context.FlowerIngredients.FindAsync(id);
@@ -141,7 +92,110 @@ namespace WebApplication1.Services
         {
             return _context.FlowerIngredients.Any(e => e.FlowerId == id);
         }
+        public async Task<FlowerIngredientDto> AddIngredientToFlower(
+       int flowerId, [FromBody] AddIngredientToFlowerDto dto)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            if (dto.QuantityRequired <= 0)
+                throw new ArgumentException();
+
+            var flower = await _context.Flowers
+                .Include(f => f.FlowerIngredients)
+                .ThenInclude(fi => fi.Ingredient)
+                .FirstOrDefaultAsync(f => f.Id == flowerId);
+
+            if (flower == null)
+                throw new DivideByZeroException();
+
+            var ingredient = await _context.Ingredients
+                .FirstOrDefaultAsync(i => i.Id == dto.IngredientId);
+
+            if (ingredient == null)
+                throw new DivideByZeroException();
+            var existing = flower.FlowerIngredients
+                .FirstOrDefault(fi => fi.IngredientId == dto.IngredientId);
+
+            decimal costChange = 0;
+
+            if (existing != null)
+            {
+                costChange = ingredient.CostPerUnit * (dto.QuantityRequired - existing.QuantityRequired);
+                existing.QuantityRequired = dto.QuantityRequired;
+            }
+            else
+            {
+                costChange = ingredient.CostPerUnit * dto.QuantityRequired;
+
+                var newFlowerIngredient = new FlowerIngredient
+                {
+                    FlowerId = flowerId,
+                    IngredientId = dto.IngredientId,
+                    QuantityRequired = dto.QuantityRequired
+                };
+
+                _context.FlowerIngredients.Add(newFlowerIngredient);
+                flower.FlowerIngredients.Add(newFlowerIngredient);
+            }
+
+            flower.CostPerUnit += costChange;
+
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return new FlowerIngredientDto
+            {
+                FlowerId = flowerId,
+                IngredientId = dto.IngredientId,
+                QuantityRequired = dto.QuantityRequired,
+                Ingredient = new IngredientDto
+                {
+                    Id = ingredient.Id,
+                    Name = ingredient.Name,
+                    InStock = ingredient.InStock,
+                    CostPerUnit = ingredient.CostPerUnit
+                }
+            };
+        }
+
+        public async Task RemoveIngredientFromFlower(int flowerId, int ingredientId)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                var flower = await _context.Flowers
+                    .Include(f => f.FlowerIngredients)
+                    .FirstOrDefaultAsync(f => f.Id == flowerId);
+                var ingredient = await _context.Ingredients.FirstOrDefaultAsync(i => i.Id == ingredientId);
+                if ((flower == null) | (ingredient == null))
+                {
+                    throw new DivideByZeroException();
+                }
+
+                var flowerIngredient = await _context.FlowerIngredients
+                    .FirstOrDefaultAsync(fi => fi.FlowerId == flowerId && fi.IngredientId == ingredientId);
+
+                if (flowerIngredient == null)
+                {
+                    throw new DivideByZeroException();
+                }
+
+                _context.FlowerIngredients.Remove(flowerIngredient);
+
+                flower.CostPerUnit = flower.CostPerUnit - flowerIngredient.QuantityRequired * ingredient.CostPerUnit;
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+
+            }
+        }
     }
-    
+
 }
+
 

@@ -8,7 +8,7 @@ namespace WebApplication1
     {
         [Required]
         [StringLength(100)]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         [Range(0, int.MaxValue)]
         public int InStock { get; set; }
@@ -20,7 +20,7 @@ namespace WebApplication1
     public class IngredientDto
     {
         public int Id { get; set; }
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public int InStock { get; set; }
         public decimal CostPerUnit { get; set; }
     }
@@ -29,29 +29,29 @@ namespace WebApplication1
     {
         public int FlowerId { get; set; }
         public int IngredientId { get; set; }
-        public int QuantityRequired { get; set; }
-        public IngredientDto Ingredient { get; set; }
+        public decimal QuantityRequired { get; set; }
+        public IngredientDto? Ingredient { get; set; }
     }
 
     public class FlowerIngredient1Dto
     {
         public int IngredientId { get; set; }
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public int QuantityRequired { get; set; }
         public decimal CostPerUnit { get; set; }
     }
     public class FlowerIngredientDtoNew
     {
         public int IngredientId { get; set; }
-        public string IngredientName { get; set; }
-        public decimal QuantityRequired { get; set; }
+        public string? IngredientName { get; set; }
+        public int QuantityRequired { get; set; }
         public decimal CostPerUnit { get; set; }
         public decimal TotalCost { get; set; }
     }
     public class IngredientStockDto
     {
         public int Id { get; set; }
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public int InStock { get; set; }
         public decimal CostPerUnit { get; set; }
         public string StockStatus => InStock switch

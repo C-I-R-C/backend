@@ -8,108 +8,115 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1;
 using WebApplication1.Models;
+using WebApplication1.Services;
 
 namespace WebApplication1.Controllers
 {
-    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class BoxesController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
-
-        public BoxesController(ApplicationDbContext context)
+        private readonly BoxService _boxService;
+        public BoxesController(BoxService boxService)
         {
-            _context = context;
+            _boxService = boxService;
         }
-
-        // GET: api/Boxes
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Box>>> GetBoxes()
+        public async Task<IEnumerable<Box>> GetBoxes()
         {
-            return await _context.Boxes.ToListAsync();
+            return await _boxService.GetBoxes();
         }
-
-        // GET: api/Boxes/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Box>> GetBox(int id)
         {
-            var box = await _context.Boxes.FindAsync(id);
-
-            if (box == null)
+            try
             {
-                return NotFound();
+                return await _boxService.GetBox(id);
             }
-
-            return box;
+            catch (DivideByZeroException)
+            {
+                return BadRequest("No such box");
+            }
+            catch
+            {
+                return Problem();
+            }
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> PutBox(int id, Box box)
         {
-            if (id != box.Id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(box).State = EntityState.Modified;
-
             try
             {
-                await _context.SaveChangesAsync();
+                await _boxService.PutBox(id, box);
+                return Ok();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DivideByZeroException)
             {
-                if (!BoxExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                return BadRequest("No such box");
             }
-
-            return NoContent();
+            catch (ArgumentException)
+            {
+                return BadRequest("Box id != id");
+            }
+            catch
+            {
+                return Problem();
+            }
         }
 
-        // POST: api/Boxes
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
         public async Task <ActionResult<BoxDto>> Create([FromBody] BoxCreateDto dto)
         {
-            var box = new Box
-            {
-                Name = dto.Name,
-                InStock = dto.InStock
-            };
-
-            _context.Boxes.Add(box);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(PutBox), new { id = box.Id },
-                new BoxDto { Id = box.Id, Name = box.Name, InStock = box.InStock });
+            return await _boxService.Create(dto);
         }
 
 
-        // DELETE: api/Boxes/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteBox(int id)
         {
-            var box = await _context.Boxes.FindAsync(id);
-            if (box == null)
+            try
             {
-                return NotFound();
+                await _boxService.DeleteBox(id);
+                return Ok();
             }
-
-            _context.Boxes.Remove(box);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            catch (DivideByZeroException)
+            {
+                return BadRequest("No such box");
+            }
+            catch
+            {
+                return Problem();
+            }
         }
-
-        private bool BoxExists(int id)
+        [HttpPatch("{id}/stock")]
+        public async Task<ActionResult<BoxDto>> UpdateBoxStock(
+        int id,
+        [FromBody] BoxStockUpdateDto updateDto)
         {
-            return _context.Boxes.Any(e => e.Id == id);
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var result = await _boxService.UpdateBoxStock(id, updateDto);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Error updating box stock");
+            }
         }
+        
     }
 }

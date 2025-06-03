@@ -41,11 +41,10 @@ namespace WebApplication1.Services
         }
         public async Task<OrderResponseDto> Create([FromBody] OrderCreateDto orderDto)
         {
-            // Validate client exists
+
             var client = _context.Clients.FirstOrDefault(c => c.Id == orderDto.ClientId);
             if (client == null) throw new ArgumentException();
 
-            // Validate all items exist
             foreach (var itemDto in orderDto.Items)
             {
                 if (!_context.Items.Any(i => i.Id == itemDto.ItemId))
@@ -66,18 +65,16 @@ namespace WebApplication1.Services
                     {
                         ItemId = item.Id,
                         Quantity = itemDto.Quantity,
-                        UnitPrice = item.BasePrice // Store price at time of order
+                        UnitPrice = item.BasePrice 
                     };
                 }).ToList()
             };
 
-            // Calculate total with discount
             order.TotalPrice = order.OrderItems.Sum(oi => oi.UnitPrice * oi.Quantity)
                               * (100 - client.DiscountLevel) / 100;
 
             _context.Orders.Add(order);
 
-            // Update client's order count
             client.TotalOrdersCount = _context.Orders.Count(o => o.ClientId == client.Id);
             await _context.SaveChangesAsync();
             return MapToOrderResponseDto(order);
@@ -90,7 +87,6 @@ namespace WebApplication1.Services
                 throw new DivideByZeroException();
             }
 
-            // Only allow updating certain fields
             order.Comment = orderDto.Comment ?? order.Comment;
             order.IsCurrent = orderDto.IsCurrent ?? order.IsCurrent;
 
@@ -112,61 +108,72 @@ namespace WebApplication1.Services
         }
         public async Task<OrderResponseDto> MarkAsCompleted(int id)
         {
-            // Load the order with its items
-            var order = await _context.Orders
-                .Include(o => o.OrderItems)
-                .FirstOrDefaultAsync(o => o.Id == id);
+            using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
 
-            if (order == null)
+            try
             {
-                throw new KeyNotFoundException($"Order with ID {id} not found");
-            }
+                var order = await _context.Orders
+                    .Include(o => o.OrderItems)
+                    .FirstOrDefaultAsync(o => o.Id == id);
 
-            if (!order.IsCurrent)
-            {
-                throw new InvalidOperationException("Order is already completed");
-            }
-            var itemIds = order.OrderItems.Select(oi => oi.ItemId).ToList();
+                if (order == null)
+                {
+                    throw new KeyNotFoundException($"Order with ID {id} not found");
+                }
+
+                if (!order.IsCurrent)
+                {
+                    throw new InvalidOperationException("Order is already completed");
+                }
+
+                var itemIds = order.OrderItems.Select(oi => oi.ItemId).ToList();
 
                 var itemsWithFlowers = await _context.Items
                     .Where(i => itemIds.Contains(i.Id))
                     .Include(i => i.ItemFlowers)
                         .ThenInclude(itemf => itemf.Flower)
-            .ToListAsync();
+                    .ToListAsync();
 
-            // Create a dictionary for quick lookup
-            var itemsDictionary = itemsWithFlowers.ToDictionary(i => i.Id);
-            // Process each order item
-            foreach (var orderItem in order.OrderItems)
-            {
-                if (!itemsDictionary.TryGetValue(orderItem.ItemId, out var item))
+                var itemsDictionary = itemsWithFlowers.ToDictionary(i => i.Id);
+
+                foreach (var orderItem in order.OrderItems)
                 {
-                    throw new KeyNotFoundException($"Item with ID {orderItem.ItemId} not found");
-                }
-
-                foreach (var itemFlower in item.ItemFlowers)
-                {
-                    var flower = itemFlower.Flower;
-                    if (flower == null) continue;
-
-                    var quantityToDeduct = itemFlower.Quantity * orderItem.Quantity;
-
-                    if (flower.InStock < quantityToDeduct)
+                    if (!itemsDictionary.TryGetValue(orderItem.ItemId, out var item))
                     {
-                        throw new InvalidOperationException(
-                            $"Not enough stock for flower {flower.Name}. " +
-                            $"Required: {quantityToDeduct}, Available: {flower.InStock}");
+                        throw new KeyNotFoundException($"Item with ID {orderItem.ItemId} not found");
                     }
 
-                    flower.InStock -= quantityToDeduct;
+                    foreach (var itemFlower in item.ItemFlowers)
+                    {
+                        var flower = itemFlower.Flower;
+                        if (flower == null) continue;
+
+                        var quantityToDeduct = itemFlower.Quantity * orderItem.Quantity;
+
+                        if (flower.InStock < quantityToDeduct)
+                        {
+                            throw new InvalidOperationException(
+                                $"Not enough stock for flower {flower.Name}. " +
+                                $"Required: {quantityToDeduct}, Available: {flower.InStock}");
+                        }
+
+                        flower.InStock -= quantityToDeduct;
+                    }
                 }
+
+                order.IsCurrent = false;
+                order.OrderCompleteDate = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return MapToOrderResponseDto(order);
             }
-
-            order.IsCurrent = false;
-            order.OrderCompleteDate = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            return MapToOrderResponseDto(order);
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
         public async Task DeleteOrder(int id)
         {
@@ -258,14 +265,11 @@ namespace WebApplication1.Services
     int pageNumber = 1,
     int pageSize = 20)
         {
-            // 1. Prepare the base query with includes
             var baseQuery = _context.Orders
                 .Include(o => o.Client)
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Item)
                 .AsQueryable();
-
-            // 2. Convert input dates to UTC dates (date-only)
             var utcOrderDate = orderDate.HasValue
                 ? orderDate.Value.Kind == DateTimeKind.Unspecified
                     ? DateTime.SpecifyKind(orderDate.Value.Date, DateTimeKind.Utc)
@@ -278,7 +282,7 @@ namespace WebApplication1.Services
                     : completionDate.Value.Date.ToUniversalTime()
                 : (DateTime?)null;
 
-            // 3. Apply filters with PostgreSQL-compatible date comparison
+
             if (utcOrderDate.HasValue)
             {
                 baseQuery = baseQuery.Where(o =>
@@ -298,10 +302,9 @@ namespace WebApplication1.Services
                 baseQuery = baseQuery.Where(o => o.IsCurrent == !isCompleted.Value);
             }
 
-            // 4. Get total count (before pagination)
+
             var totalCount = await baseQuery.CountAsync();
 
-            // 5. Apply pagination with ordering
             var orders = await baseQuery
     .OrderByDescending(o => o.OrderDate)
     .Skip((pageNumber - 1) * pageSize)
@@ -331,11 +334,9 @@ namespace WebApplication1.Services
                 Name = oi.Item.Name,
                 BasePrice = oi.Item.BasePrice
             } : null
-            // Include other OrderItemWithDetailsDto properties as needed
         }).ToList()
     })
     .ToListAsync();
-            // 6. Return the paged result
             return new PagedResponse<OrderResponseDto>
             {
                 PageNumber = pageNumber,
@@ -349,10 +350,10 @@ namespace WebApplication1.Services
             var now = DateTime.UtcNow;
 
             return await _context.Orders
-                .Where(o => o.IsCurrent) // Only unfinished orders
-                .Where(o => o.OrderCompleteDate > now) // Not yet past due
-                .OrderBy(o => o.OrderCompleteDate) // Orders with closest dates first
-                .Take(count) // Limit results
+                .Where(o => o.IsCurrent)
+                .Where(o => o.OrderCompleteDate > now)
+                .OrderBy(o => o.OrderCompleteDate)
+                .Take(count) 
                 .Select(o => new UrgentOrderDto
                 {
                     OrderId = o.Id,
@@ -363,6 +364,239 @@ namespace WebApplication1.Services
                     TotalPrice = o.TotalPrice
                 })
                 .ToListAsync();
+        }
+        public async Task<OrderProfitDto> CalculateOrderProfit(int orderId)
+        {
+            var order = await _context.Orders
+                .Include(o => o.Client)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Item)
+                        .ThenInclude(i => i.ItemFlowers)
+                            .ThenInclude(itemf => itemf.Flower)
+                        .ThenInclude(f => f.FlowerIngredients)
+                            .ThenInclude(fi => fi.Ingredient)
+        .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.Item)
+                .ThenInclude(i => i.Box)
+        .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                throw new KeyNotFoundException("Order not found");
+
+            var result = new OrderProfitDto
+            {
+                OrderId = orderId,
+                TotalSellingPrice = order.TotalPrice
+            };
+
+            foreach (var orderItem in order.OrderItems)
+            {
+                var item = orderItem.Item;
+                decimal itemCost = 0;
+
+                foreach (var itemFlower in item.ItemFlowers)
+                {
+                    var flower = itemFlower.Flower;
+                    itemCost += flower.CostPerUnit * itemFlower.Quantity * orderItem.Quantity;
+
+                    foreach (var flowerIngredient in flower.FlowerIngredients)
+                    {
+                        itemCost += flowerIngredient.Ingredient.CostPerUnit *
+                                   flowerIngredient.QuantityRequired *
+                                   itemFlower.Quantity *
+                                   orderItem.Quantity;
+                    }
+                }
+
+                if (item.Box != null)
+                {
+                    itemCost += item.Box.CostPerUnit * orderItem.Quantity;
+                }
+
+                result.TotalActualCost += itemCost;
+            }
+
+            decimal discountRate = order.Client?.DiscountLevel / 100m ?? 0;
+            result.DiscountAmount = result.TotalSellingPrice * discountRate;
+
+            result.ProfitBeforeDiscount = result.TotalSellingPrice - result.TotalActualCost;
+            result.FinalProfit = result.ProfitBeforeDiscount - result.DiscountAmount;
+            result.FinalProfit = result.FinalProfit * Convert.ToDecimal(0.7);
+            result.ProfitMargin = result.TotalActualCost > 0 ?
+                (result.FinalProfit / result.TotalActualCost) * 100 : 0;
+
+            return result;
+        }
+        public async Task<OrderValidationResult> ValidateOrderMaterials(int orderId)
+        {
+            try
+            {
+                var order = await _context.Orders
+                    .Include(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Item)
+                            .ThenInclude(i => i.ItemFlowers)
+                                .ThenInclude(itemf => itemf.Flower)
+                            .ThenInclude(f => f.FlowerIngredients)
+                                .ThenInclude(fi => fi.Ingredient)
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Item)
+                    .ThenInclude(i => i.Box)
+            .FirstOrDefaultAsync(o => o.Id == orderId);
+
+                if (order == null)
+                    throw new DivideByZeroException();
+
+                var result = new OrderValidationResult
+                {
+                    OrderId = orderId,
+                    IsValid = true,
+                    FlowerStatuses = new List<MaterialStatus>(),
+                    IngredientStatuses = new List<MaterialStatus>(),
+                    BoxStatuses = new List<MaterialStatus>()
+                };
+
+                var (flowerRequirements, ingredientRequirements, boxRequirements) = CalculateRequirements(order);
+
+                result = await ValidateAllMaterialsAsync(
+                    flowerRequirements,
+                    ingredientRequirements,
+                    boxRequirements,
+                    result);
+
+                return result;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        private (Dictionary<int, int> flowers,
+                 Dictionary<int, int> ingredients,
+                 Dictionary<int, int> boxes)
+            CalculateRequirements(Order order)
+        {
+            var flowerRequirements = new Dictionary<int, int>();
+            var ingredientRequirements = new Dictionary<int, int>();
+            var boxRequirements = new Dictionary<int, int>();
+
+            foreach (var orderItem in order.OrderItems)
+            {
+                foreach (var itemFlower in orderItem.Item.ItemFlowers)
+                {
+                    var totalFlowersNeeded = itemFlower.Quantity * orderItem.Quantity;
+                    AddToDictionary(flowerRequirements, itemFlower.FlowerId, totalFlowersNeeded);
+
+                    foreach (var flowerIngredient in itemFlower.Flower.FlowerIngredients)
+                    {
+                        var totalIngredientsNeeded = flowerIngredient.QuantityRequired *
+                                                   itemFlower.Quantity *
+                                                   orderItem.Quantity;
+                        AddToDictionary(ingredientRequirements, flowerIngredient.IngredientId, totalIngredientsNeeded);
+                    }
+                }
+
+                if (orderItem.Item.BoxId.HasValue)
+                {
+                    AddToDictionary(boxRequirements, orderItem.Item.BoxId.Value, orderItem.Quantity);
+                }
+            }
+
+            return (flowerRequirements, ingredientRequirements, boxRequirements);
+        }
+
+        private async Task<OrderValidationResult> ValidateAllMaterialsAsync(
+            Dictionary<int, int> flowerRequirements,
+            Dictionary<int, int> ingredientRequirements,
+            Dictionary<int, int> boxRequirements,
+            OrderValidationResult result)
+        {
+            // Validate flowers
+            var flowerValidation = await ValidateMaterialsAsync(
+                flowerRequirements,
+                _context.Flowers,
+                f => f.Id,
+                f => f.Name,
+                f => f.InStock);
+
+            result.FlowerStatuses = flowerValidation.statuses;
+            if (!flowerValidation.allAvailable) result.IsValid = false;
+
+            var ingredientValidation = await ValidateMaterialsAsync(
+                ingredientRequirements,
+                _context.Ingredients,
+                i => i.Id,
+                i => i.Name,
+                i => i.InStock);
+
+            result.IngredientStatuses = ingredientValidation.statuses;
+            if (!ingredientValidation.allAvailable) result.IsValid = false;
+
+            var boxValidation = await ValidateMaterialsAsync(
+                boxRequirements,
+                _context.Boxes,
+                b => b.Id,
+                b => b.Name,
+                b => b.InStock);
+
+            result.BoxStatuses = boxValidation.statuses;
+            if (!boxValidation.allAvailable) result.IsValid = false;
+
+            return result;
+        }
+
+        private async Task<(List<MaterialStatus> statuses, bool allAvailable)> ValidateMaterialsAsync<T>(
+            Dictionary<int, int> requirements,
+            DbSet<T> dbSet,
+            Func<T, int> idSelector,
+            Func<T, string> nameSelector,
+            Func<T, int> stockSelector) where T : class
+        {
+            var statuses = new List<MaterialStatus>();
+            bool allAvailable = true;
+
+            foreach (var req in requirements)
+            {
+                var material = await dbSet.FindAsync(req.Key);
+                if (material == null)
+                {
+                    statuses.Add(new MaterialStatus
+                    {
+                        MaterialId = req.Key,
+                        MaterialName = "Unknown",
+                        RequiredQuantity = req.Value,
+                        AvailableQuantity = 0,
+                        IsAvailable = false
+                    });
+                    allAvailable = false;
+                    continue;
+                }
+
+                bool isAvailable = stockSelector(material) >= req.Value;
+                if (!isAvailable) allAvailable = false;
+
+                statuses.Add(new MaterialStatus
+                {
+                    MaterialId = idSelector(material),
+                    MaterialName = nameSelector(material),
+                    RequiredQuantity = req.Value,
+                    AvailableQuantity = stockSelector(material),
+                    IsAvailable = isAvailable
+                });
+            }
+
+            return (statuses, allAvailable);
+        }
+        private void AddToDictionary(Dictionary<int, int> dict, int id, int quantity)
+        {
+            if (dict.ContainsKey(id))
+            {
+                dict[id] += quantity;
+            }
+            else
+            {
+                dict.Add(id, quantity);
+            }
         }
     }
 }

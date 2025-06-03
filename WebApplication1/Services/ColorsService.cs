@@ -1,56 +1,40 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using WebApplication1;
 using WebApplication1.Models;
 
-namespace WebApplication1.Controllers
+namespace WebApplication1.Services
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class Colors1Controller : ControllerBase
+    public class ColorsService
     {
         private readonly ApplicationDbContext _context;
 
-        public Colors1Controller(ApplicationDbContext context)
+        public ColorsService(ApplicationDbContext context)
         {
             _context = context;
         }
-
-        // GET: api/Colors1
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Color>>> GetColors()
+        
+        public async Task<IEnumerable<Color>> GetColors()
         {
             return await _context.Colors.ToListAsync();
         }
 
-        // GET: api/Colors1/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Color>> GetColor(int id)
+        public async Task<Color> GetColor(int id)
         {
             var color = await _context.Colors.FindAsync(id);
 
             if (color == null)
             {
-                return NotFound();
+                throw new DivideByZeroException();
             }
 
             return color;
         }
 
-        // PUT: api/Colors1/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutColor(int id, Color color)
+        public async Task PutColor(int id, Color color)
         {
             if (id != color.Id)
             {
-                return BadRequest();
+                throw new DivideByZeroException();
             }
 
             _context.Entry(color).State = EntityState.Modified;
@@ -63,7 +47,7 @@ namespace WebApplication1.Controllers
             {
                 if (!ColorExists(id))
                 {
-                    return NotFound();
+                    throw new DivideByZeroException();
                 }
                 else
                 {
@@ -71,13 +55,8 @@ namespace WebApplication1.Controllers
                 }
             }
 
-            return NoContent();
         }
-
-        // POST: api/Colors1
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
-        public async Task <ActionResult<ColorDto>> Create([FromBody] ColorCreateDto colorDto)
+        public async Task<ActionResult<ColorDto>> Create([FromBody] ColorCreateDto colorDto)
         {
             var color = new Color
             {
@@ -87,29 +66,28 @@ namespace WebApplication1.Controllers
 
             _context.Colors.Add(color);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetColor), new { id = color.Id },
-                new ColorDto
+            return new ColorDto
                 {
                     Id = color.Id,
                     Name = color.Name,
                     IsNatural = color.IsNatural
-                });
+                };
         }
-
-        // DELETE: api/Colors1/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteColor(int id)
+        public async Task DeleteColor(int id)
         {
             var color = await _context.Colors.FindAsync(id);
             if (color == null)
             {
-                return NotFound();
+                throw new DivideByZeroException();
             }
-
+            var isUsedInFlowers = await _context.Flowers.AnyAsync(oi => oi.ColorId == id);
+            if (isUsedInFlowers)
+            {
+                throw new ArgumentException();
+            }
             _context.Colors.Remove(color);
             await _context.SaveChangesAsync();
 
-            return NoContent();
         }
 
         private bool ColorExists(int id)

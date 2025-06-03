@@ -29,11 +29,11 @@ namespace WebApplication1.Services
                 } : null
             });
 
-            return flowers.ToList();
+            return await flowers.ToListAsync();
         }
         public async Task<FlowerWithIngredientsDto> GetById(int id)
         {
-            var flower = _data.Flowers.FirstOrDefault(f => f.Id == id);
+            var flower = await _data.Flowers.FirstOrDefaultAsync(f => f.Id == id);
             if (flower == null)
             {
                 throw new DivideByZeroException();
@@ -112,7 +112,6 @@ namespace WebApplication1.Services
             throw new DivideByZeroException();
             }
 
-            // Check if flower is used in any items
             if (_data.ItemFlowers.Any(itemf => itemf.FlowerId == id))
             {
                 throw new BadImageFormatException();
@@ -123,12 +122,10 @@ namespace WebApplication1.Services
         }
         public async Task<FlowerDto> UpdateQuantity(int id, FlowerQuantityUpdateDto updateDto)
         {
-            // Start transaction
             using var transaction = await _data.Database.BeginTransactionAsync();
 
             try
             {
-                // Get flower with ingredients and their ingredients
                 var flower = await _data.Flowers
                     .Include(f => f.FlowerIngredients)
                         .ThenInclude(fi => fi.Ingredient)
@@ -139,17 +136,14 @@ namespace WebApplication1.Services
                     throw new KeyNotFoundException("Flower not found");
                 }
 
-                // Store original stock for potential rollback
                 var originalStock = flower.InStock;
                 var originalIngredientStocks = flower.FlowerIngredients
                     .ToDictionary(fi => fi.IngredientId, fi => fi.Ingredient.InStock);
 
                 if (updateDto.IsIncrement)
                 {
-                    // Increase flower stock
-                    flower.InStock += updateDto.Quantity;
-
-                    // Decrease ingredient stocks
+                    
+                    
                     foreach (var flowerIngredient in flower.FlowerIngredients)
                     {
                         var ingredient = flowerIngredient.Ingredient;
@@ -164,10 +158,10 @@ namespace WebApplication1.Services
 
                         ingredient.InStock -= quantityToDeduct;
                     }
+                    flower.InStock += updateDto.Quantity;
                 }
                 else
                 {
-                    // Decrease flower stock
                     if (flower.InStock < updateDto.Quantity)
                     {
                         throw new InvalidOperationException(

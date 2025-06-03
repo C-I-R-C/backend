@@ -12,7 +12,53 @@ namespace WebApplication1.Services
         {
             _context = context;
         }
+        public async Task<List<Ingredient>> GetIngredients()
+        {
+            return await _context.Ingredients.ToListAsync();
+        }
+        public async Task<Ingredient> GetIngredient(int id)
+        {
+            var ingredient = await _context.Ingredients.FindAsync(id);
 
+            if (ingredient == null)
+            {
+                throw new ArgumentException("NoIngre");
+            }
+
+            return ingredient;
+        }
+        public async Task DeleteIngredient(int id)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                var ingredient = await _context.Ingredients.FindAsync(id);
+                if (ingredient == null)
+                {
+                    throw new ArgumentException("No Ingredient with such id");
+                }
+                var isUsedInFlowers = await _context.FlowerIngredients
+                    .AnyAsync(fi => fi.IngredientId == id);
+
+                if (isUsedInFlowers)
+                {
+
+                    throw new DivideByZeroException();
+                    
+                }
+
+                _context.Ingredients.Remove(ingredient);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
         public async Task PutIngredient(int id, Ingredient ingredient)
         {
             if (id != ingredient.Id)

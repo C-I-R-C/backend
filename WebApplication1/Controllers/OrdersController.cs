@@ -16,12 +16,10 @@ namespace WebApplication1.Controllers
     [ApiController]
     public class OrdersController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
         private readonly OrderService _orderService;
 
         public OrdersController(ApplicationDbContext context, OrderService orderService)
         {
-            _context = context;
             _orderService = orderService;
         }
 
@@ -50,7 +48,6 @@ namespace WebApplication1.Controllers
             }
         }
 
-        // POST: api/Orders
         [HttpPost]
         public async Task<ActionResult<OrderResponseDto>> Create([FromBody] OrderCreateDto orderDto)
         {
@@ -72,7 +69,6 @@ namespace WebApplication1.Controllers
             }
         }
 
-        // PUT: api/Orders/5
         [HttpPut("{id}")]
         public async Task<IActionResult> PutOrder(int id, OrderUpdateDto orderDto)
         {
@@ -108,7 +104,6 @@ namespace WebApplication1.Controllers
             }
         }
 
-        // DELETE: api/Orders/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteOrder(int id)
         {
@@ -132,15 +127,12 @@ namespace WebApplication1.Controllers
     [FromQuery] int pageNumber = 1,
     [FromQuery] int pageSize = 20)
         {
-
-                // Validate pagination parameters
                 if (pageNumber < 1) return BadRequest("Page number must be at least 1");
                 if (pageSize < 1 || pageSize > 100) return BadRequest("Page size must be between 1 and 100");
                 DateTime? OrderDate =
                 DateTime.TryParse(query.OrderDateString, out var date)? DateTime.SpecifyKind(date.Date, DateTimeKind.Utc) : null;
                 DateTime? CompletionDate = DateTime.TryParse(query.CompletionDateString, out var date1) ? DateTime.SpecifyKind(date1.Date, DateTimeKind.Utc): null;
-            // Validate at least one filter is provided
-            if (OrderDate == null &&
+                if (OrderDate == null &&
                     CompletionDate == null &&
                     !query.IsCompleted.HasValue)
                 {
@@ -173,10 +165,45 @@ namespace WebApplication1.Controllers
                 var urgentOrders = await _orderService.GetMostUrgentOrders(count);
                 return Ok(urgentOrders);
             }
-            catch (Exception ex)
+            catch
             {
                 return StatusCode(500, "Error retrieving urgent orders");
             }
         }
+        [HttpGet("{id}/profit")]
+        public async Task<ActionResult<OrderProfitDto>> GetOrderProfit(int id)
+        {
+            try
+            {
+                var profit = await _orderService.CalculateOrderProfit(id);
+                return Ok(profit);
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound();
+            }
+            catch
+            {
+                return StatusCode(500, "Error calculating profit");
+            }
+        }
+
+        [HttpGet("validate-order/{orderId}")]
+        public async Task<ActionResult<OrderValidationResult>> ValidateOrderMaterials(int orderId)
+        {
+            try
+            {
+                return await _orderService.ValidateOrderMaterials(orderId);
+            }
+            catch (DivideByZeroException)
+            {
+                return BadRequest("NotFound");
+            }
+            catch
+            {
+                return Problem();
+            }
+        }
     }
-    }
+}
+

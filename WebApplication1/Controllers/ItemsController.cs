@@ -15,12 +15,10 @@ namespace WebApplication1.Controllers
     [ApiController]
     public class ItemsController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
         private readonly ItemsService _itemsService;
 
-        public ItemsController(ApplicationDbContext context, ItemsService itemsService)
+        public ItemsController(ItemsService itemsService)
         {
-            _context = context;
             _itemsService = itemsService;
         }
 
@@ -50,20 +48,26 @@ namespace WebApplication1.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutItem(int id, ItemUpdateDto itemDto)
+        public async Task<IActionResult> PutItem(int id, [FromBody] ItemUpdateDto itemDto)
         {
             try
             {
-                await PutItem(id, itemDto);
-                return Ok();
+                if (id != itemDto.Id)
+                {
+                    return BadRequest("ID mismatch");
+                }
+
+                var result = await _itemsService.UpdateItemAsync(itemDto);
+
+                return result ? Ok() : NotFound();
             }
-            catch (DivideByZeroException)
+            catch (KeyNotFoundException ex)
             {
-                return BadRequest("Item not found");
+                return NotFound(ex.Message);
             }
-            catch
+            catch (Exception ex)
             {
-                return Problem();
+                return Problem(detail: ex.Message);
             }
         }
 
@@ -98,13 +102,28 @@ namespace WebApplication1.Controllers
             {
                 return BadRequest("Item not found");
             }
+            catch (AbandonedMutexException)
+            {
+                return BadRequest("Item is used in order");
+            }
             catch
             {
                 return Problem();
             }
         }
-
+        [HttpGet("{id}/cost-analysis")]
+        public async Task<ActionResult<ItemCostAnalysisDto>> GetItemCostAnalysis(int id)
+        {
+            try
+            {
+                var analysis = await _itemsService.CalculateItemCostAnalysis(id);
+                return Ok(analysis);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 
-    // DTO classes
 }

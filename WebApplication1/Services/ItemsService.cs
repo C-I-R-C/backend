@@ -91,41 +91,20 @@ namespace WebApplication1.Services
 
             return itemDto;
         }
-        public async Task PutItem(int id, ItemUpdateDto itemDto)
+        public async Task<bool> UpdateItemAsync(ItemUpdateDto itemDto)
         {
-            var item = await _context.Items.FindAsync(id);
-            if (item == null)
-            {
-                throw new DivideByZeroException();
-            }
+            var item = await _context.Items.FindAsync(itemDto.Id);
+            if (item == null) return false;
 
             item.Name = itemDto.Name;
             item.BasePrice = itemDto.BasePrice;
 
-            _context.Entry(item).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!ItemExists(id))
-                {
-                    throw new DivideByZeroException();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            
+            await _context.SaveChangesAsync();
+            return true;
         }
         public async Task<Item> PostItem(ItemCreateDto itemDto)
         {
-            // Check if box exists if BoxId is provided
-            if (itemDto.BoxId != null && !await _context.Boxes.AnyAsync(b => b.Id == itemDto.BoxId))
+            if (!await _context.Boxes.AnyAsync(b => b.Id == itemDto.BoxId))
             {
                 throw new DivideByZeroException();
             }
@@ -134,14 +113,14 @@ namespace WebApplication1.Services
             {
                 Name = itemDto.Name,
                 BasePrice = itemDto.BasePrice,
-                BoxId = itemDto.BoxId // Only set the foreign key
+                BoxId = itemDto.BoxId
 
             };
 
             _context.Items.Add(item);
             await _context.SaveChangesAsync();
 
-            // Load the box if you need it in the response
+
             if (item.BoxId.HasValue)
             {
                 await _context.Entry(item)
@@ -159,21 +138,56 @@ namespace WebApplication1.Services
                 throw new DivideByZeroException();
             }
 
-            // Check if item is used in any orders
             var isUsedInOrders = await _context.OrderItems.AnyAsync(oi => oi.ItemId == id);
             if (isUsedInOrders)
             {
-                throw new DivideByZeroException();
+                throw new AbandonedMutexException();
             }
 
             _context.Items.Remove(item);
             await _context.SaveChangesAsync();
 
         }
-        private bool ItemExists(int id)
+        public async Task<ItemCostAnalysisDto> CalculateItemCostAnalysis(int itemId)
         {
-            return _context.Items.Any(e => e.Id == id);
-        }
+            var item = await _context.Items
+                .Include(i => i.ItemFlowers)
+                    .ThenInclude(itemf => itemf.Flower)
+                .ThenInclude(f => f.FlowerIngredients)
+                    .ThenInclude(fi => fi.Ingredient)
+        .Include(i => i.Box)
+        .FirstOrDefaultAsync(i => i.Id == itemId);
 
+            if (item == null)
+                throw new ArgumentException("Item not found");
+
+            var result = new ItemCostAnalysisDto
+            {
+                BasePrice = item.BasePrice
+            };
+
+            foreach (var itemFlower in item.ItemFlowers)
+            {
+                var flower = itemFlower.Flower;
+                result.FlowersCost += flower.CostPerUnit * itemFlower.Quantity;
+                foreach (var flowerIngredient in flower.FlowerIngredients)
+                {
+                    result.IngredientsCost += flowerIngredient.Ingredient.CostPerUnit *
+                                             flowerIngredient.QuantityRequired *
+                                             itemFlower.Quantity;
+                }
+            }
+            result.BoxCost = item.Box?.CostPerUnit ?? 0;
+
+            result.TotalComponentsCost = result.FlowersCost + result.BoxCost;
+            result.LaborCost = result.FlowersCost - result.IngredientsCost;
+            
+            result.Profit = item.BasePrice - result.TotalComponentsCost;
+            result.Profit = Convert.ToDecimal(0.7) * result.Profit;
+            result.ProfitMargin = result.TotalComponentsCost > 0 ?
+                                 (result.Profit / result.TotalComponentsCost) : 0;
+
+            return result;
+        }
     }
 }

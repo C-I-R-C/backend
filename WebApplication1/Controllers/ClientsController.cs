@@ -10,24 +10,17 @@ namespace WebApplication1.Controllers
     [Route("api/[controller]")]
     public class ClientsController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
         private readonly ClientsService _clientService;
-        public ClientsController(ApplicationDbContext context, ClientsService clientsService)
+        public ClientsController(ClientsService clientsService)
         {
-            _context = context;
             _clientService = clientsService;
         }
-
-        // DTO classes
-
-        // GET: api/Clients
         [HttpGet]
         public async Task<ActionResult<List<ClientResponseDto>>> GetClients()
         {
             return await _clientService.GetClients();
         }
 
-        // GET: api/Clients/5
         [HttpGet("{id}")]
         public async Task<ActionResult<ClientResponseDto>> GetClient(int id, bool isWithOrders)
         {
@@ -45,33 +38,42 @@ namespace WebApplication1.Controllers
 
         }
 
-
-        // PUT: api/Clients/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutClient(int id, ClientUpdateDto clientDto)
+        public async Task<IActionResult> PutClient(int id, [FromBody] ClientUpdateDto clientDto)
         {
             try
             {
-                await PutClient(id, clientDto);
-                return Ok();
+                await _clientService.PutClient(id, clientDto);
+                return Ok(); 
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return NotFound($"Client with ID {id} no longer exists");
+
             }
             catch (DivideByZeroException)
             {
-                return NotFound();
+                return BadRequest("Client not found");
+            }
+            catch (AbandonedMutexException)
+            {
+                return BadRequest("Discount must be between 1 and 100");
+            }
+            catch (ArgumentException)
+            {
+                return BadRequest("ID mismatch");
             }
             catch
             {
-                return Problem();
+                return StatusCode(500, "An error occurred while updating the client");
             }
         }
 
-        // POST: api/Clients
         [HttpPost]
         public async Task <ActionResult<ClientResponseDto>> Create([FromBody] ClientCreateDto clientDto)
         {
             return await _clientService.Create(clientDto);
         }
-        // DELETE: api/Clients/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteClient(int id)
         {

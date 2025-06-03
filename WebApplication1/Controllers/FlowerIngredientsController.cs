@@ -18,22 +18,29 @@ namespace WebApplication1.Controllers
     public class FlowerIngredientsController : ControllerBase
     {
         private readonly FlowerIngredientsService _flowerIngredientsService;
-        private readonly ApplicationDbContext _context;
 
-        public FlowerIngredientsController(ApplicationDbContext context, FlowerIngredientsService flowerIngredientsService)
+        public FlowerIngredientsController(FlowerIngredientsService flowerIngredientsService)
         {
-            _context = context;
             _flowerIngredientsService = flowerIngredientsService;
         }
 
-        // GET: api/FlowerIngredients1
         [HttpGet]
-        public async Task <ActionResult<IEnumerable<FlowerIngredientDto>>> GetIngredientsForFlower(int flowerId)
+        public async Task<ActionResult<IEnumerable<FlowerIngredientDto>>> GetIngredientsForFlower(int flowerId)
         {
-            return await _flowerIngredientsService.GetIngredientsForFlower(flowerId);
+            try
+            {
+                return await _flowerIngredientsService.GetIngredientsForFlower(flowerId);
+            }
+            catch (DivideByZeroException)
+            {
+                return NotFound("flower not found");
+            }
+            catch
+            {
+                return Problem();
+            }
         }
 
-        // GET: api/FlowerIngredients1/5
         [HttpGet("{id}")]
         public async Task<ActionResult<FlowerIngredient>> GetFlowerIngredient(int id)
         {
@@ -51,8 +58,6 @@ namespace WebApplication1.Controllers
             }
         }
 
-        // PUT: api/FlowerIngredients1/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
         public async Task<IActionResult> PutFlowerIngredient(int id, FlowerIngredient flowerIngredient)
         {
@@ -75,20 +80,22 @@ namespace WebApplication1.Controllers
             }
         }
         [HttpPost]
-        public async Task <ActionResult<FlowerIngredientDto>> AddIngredientToFlower(
-            int flowerId, [FromBody] AddIngredientToFlowerDto dto)
+        public async Task<ActionResult<FlowerIngredientDto>> AddIngredientToFlower(
+    int flowerId, [FromBody] AddIngredientToFlowerDto dto)
         {
+            if (dto == null)
+                return BadRequest("Ingredient data is required");
             try
             {
                 return await _flowerIngredientsService.AddIngredientToFlower(flowerId, dto);
             }
             catch (DivideByZeroException)
             {
-                return NotFound();
+                return BadRequest("Ingredient or flowert doesn't exist");
             }
-            catch (BadImageFormatException)
+            catch (ArgumentException)
             {
-                return NotFound("No such flower");
+                return BadRequest("Quantity must be greater than 0");
             }
             catch
             {
@@ -115,6 +122,29 @@ namespace WebApplication1.Controllers
             {
                 return Problem();
             }
-        } 
+        }
+        [HttpDelete("{flowerId}/ingredients/{ingredientId}")]
+        public async Task<IActionResult> RemoveIngredientFromFlower(
+    int flowerId,
+    int ingredientId)
+        { 
+            try
+            {
+                await _flowerIngredientsService.RemoveIngredientFromFlower(flowerId, ingredientId);
+                return Ok();
+            }
+            catch (DivideByZeroException)
+            {
+                return NotFound();
+            }
+            catch (BadImageFormatException)
+            {
+                return NotFound("No such flower");
+            }
+            catch
+            {
+                return Problem();
+            }
+        }
     }
 }

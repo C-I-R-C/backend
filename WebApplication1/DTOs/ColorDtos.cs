@@ -7,7 +7,7 @@ namespace WebApplication1
     public class ColorDto
     {
         public int Id { get; set; }
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public bool IsNatural { get; set; }
     }
 
@@ -15,7 +15,7 @@ namespace WebApplication1
     {
         [Required]
         [StringLength(50)]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         public bool IsNatural { get; set; }
     }
@@ -23,7 +23,7 @@ namespace WebApplication1
     public class ColorUpdateDto
     {
         [StringLength(50)]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         public bool? IsNatural { get; set; }
     }

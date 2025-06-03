@@ -52,15 +52,9 @@ builder.Services.AddScoped<FlowersService>();
 builder.Services.AddScoped<FlowerIngredientsService>();
 builder.Services.AddScoped<ItemFlowersService>();
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<BoxService>();
+builder.Services.AddScoped<ColorsService>();
 
-builder.Services.AddScoped<ValidateModelAttribute>();
-builder.Services.AddScoped<LogActionFilter>();
-builder.Services.AddScoped<ConcurrencyCheckFilter>();
-builder.Services.AddScoped<StockModificationFilter>();
-builder.Services.AddScoped<ClientPhoneNumberFormatFilter>();
-builder.Services.AddScoped<OrderPriorityFilter>();
-builder.Services.AddScoped<ETagFilter>();
-builder.Services.AddScoped<CacheResponseFilter>();
 
 builder.Services.AddCors(option =>
 {
