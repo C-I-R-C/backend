@@ -1,83 +1,175 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using WebApplication1.Exceptions;
 using WebApplication1.Models;
 
 namespace WebApplication1.Services
 {
-    public class BoxService
+    public interface IBoxService
+    {
+        Task<IEnumerable<Box>> GetBoxes();
+        Task<Box> GetBox(int id);
+        Task PutBox(int id, Box box);
+        Task<BoxDto> Create(BoxCreateDto dto);
+        Task DeleteBox(int id);
+        Task<BoxDto> UpdateBoxStock(int boxId, BoxStockUpdateDto updateDto);
+    }
+
+    public class BoxService : IBoxService
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<BoxService> _logger;
 
-        public BoxService(ApplicationDbContext context)
+        public BoxService(ApplicationDbContext context, ILogger<BoxService> logger)
         {
             _context = context;
+            _logger = logger;
         }
+
         public async Task<IEnumerable<Box>> GetBoxes()
         {
-            return await _context.Boxes.ToListAsync();
-        }
-        public async Task<Box> GetBox(int id)
-        {
-            var box = await _context.Boxes.FindAsync(id);
-
-            if (box == null)
-            {
-                throw new DivideByZeroException();
-            }
-
-            return box;
-        }
-        public async Task PutBox(int id, Box box)
-        {
-            if (id != box.Id)
-            {
-                throw new ArgumentException();
-            }
-
-            _context.Entry(box).State = EntityState.Modified;
-
             try
             {
-                await _context.SaveChangesAsync();
+                return await _context.Boxes.ToListAsync();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (Exception ex)
             {
-                if (!BoxExists(id))
-                {
-                    throw new DivideByZeroException();
-                }
-                else
-                {
-                    throw;
-                }
+                _logger.LogError(ex, "Error retrieving boxes");
+                throw;
             }
-
         }
-        public async Task<ActionResult<BoxDto>> Create([FromBody] BoxCreateDto dto)
+
+        public async Task<Box> GetBox(int id)
         {
-            var box = new Box
+            try
             {
-                Name = dto.Name,
-                InStock = dto.InStock,
-                CostPerUnit = dto.CostPerUnit,
-            };
+                var box = await _context.Boxes.FindAsync(id);
 
-            _context.Boxes.Add(box);
-            await _context.SaveChangesAsync();
-            return new BoxDto { Id = box.Id, Name = box.Name, InStock = box.InStock, CostPerUnit = box.CostPerUnit };
+                if (box == null)
+                {
+                    throw new BoxNotFoundException();
+                }
+
+                return box;
+            }
+            catch (BoxNotFoundException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving box with ID {BoxId}", id);
+                throw;
+            }
         }
+
+        public async Task PutBox(int id, Box box)
+        {
+            try
+            {
+                if (id != box.Id)
+                {
+                    throw new AppValidationException("Box ID in URL does not match ID in body");
+                }
+
+                _context.Entry(box).State = EntityState.Modified;
+
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (!BoxExists(id))
+                    {
+                        throw new BoxNotFoundException();
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+            }
+            catch (BoxNotFoundException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating box with ID {BoxId}", id);
+                throw;
+            }
+        }
+
+        public async Task<BoxDto> Create(BoxCreateDto dto)
+        {
+            try
+            {
+                // Валидация бизнес-правил
+                if (dto.InStock < 0)
+                {
+                    throw new AppValidationException("Stock quantity cannot be negative");
+                }
+
+                if (dto.CostPerUnit < 0)
+                {
+                    throw new AppValidationException("Cost per unit cannot be negative");
+                }
+
+                var box = new Box
+                {
+                    Name = dto.Name,
+                    InStock = dto.InStock,
+                    CostPerUnit = dto.CostPerUnit,
+                };
+
+                _context.Boxes.Add(box);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Created new box with ID {BoxId}", box.Id);
+
+                return new BoxDto
+                {
+                    Id = box.Id,
+                    Name = box.Name,
+                    InStock = box.InStock,
+                    CostPerUnit = box.CostPerUnit
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating new box");
+                throw;
+            }
+        }
+
         public async Task DeleteBox(int id)
         {
-            var box = await _context.Boxes.FindAsync(id);
-            if (box == null)
+            try
             {
-                throw new DivideByZeroException();
+                var box = await _context.Boxes.FindAsync(id);
+                if (box == null)
+                {
+                    throw new BoxNotFoundException();
+                }
+
+                _context.Boxes.Remove(box);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Deleted box with ID {BoxId}", id);
             }
-
-            _context.Boxes.Remove(box);
-            await _context.SaveChangesAsync();
-
+            catch (BoxNotFoundException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting box with ID {BoxId}", id);
+                throw;
+            }
         }
+
         public async Task<BoxDto> UpdateBoxStock(int boxId, BoxStockUpdateDto updateDto)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
@@ -89,34 +181,39 @@ namespace WebApplication1.Services
 
                 if (box == null)
                 {
-                    throw new KeyNotFoundException($"Box with ID {boxId} not found");
+                    throw new BoxNotFoundException();
+                }
+
+                if (updateDto.Quantity <= 0)
+                {
+                    throw new AppValidationException("Quantity must be greater than zero");
                 }
 
                 if (updateDto.IsIncrement)
                 {
                     box.InStock += updateDto.Quantity;
-
                 }
                 else
                 {
                     if (box.InStock < updateDto.Quantity)
                     {
-                        throw new InvalidOperationException(
+                        throw new BusinessRuleException(
                             $"Cannot remove {updateDto.Quantity} from stock. Only {box.InStock} available.");
                     }
                     box.InStock -= updateDto.Quantity;
-
-
                 }
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
+
+                _logger.LogInformation("Updated stock for box {BoxId}. New stock: {Stock}", boxId, box.InStock);
 
                 return new BoxDto
                 {
                     Id = box.Id,
                     Name = box.Name,
                     InStock = box.InStock,
+                    CostPerUnit = box.CostPerUnit
                 };
             }
             catch
@@ -125,6 +222,7 @@ namespace WebApplication1.Services
                 throw;
             }
         }
+
         private bool BoxExists(int id)
         {
             return _context.Boxes.Any(e => e.Id == id);

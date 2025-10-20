@@ -5,17 +5,21 @@ using WebApplication1.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using WebApplication1.Filters; // Добавьте это
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Конфигурация базы данных
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Конфигурация контроллеров
-builder.Services.AddControllers();
+// Конфигурация контроллеров с глобальным фильтром ошибок
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<GlobalExceptionFilter>(); // Добавьте это
+});
 
 // Настройка Swagger
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -44,6 +48,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// Регистрация сервисов
 builder.Services.AddScoped<ClientsService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<IngredientsService>();
@@ -52,9 +57,10 @@ builder.Services.AddScoped<FlowersService>();
 builder.Services.AddScoped<FlowerIngredientsService>();
 builder.Services.AddScoped<ItemFlowersService>();
 builder.Services.AddScoped<TokenService>();
-builder.Services.AddScoped<BoxService>();
 builder.Services.AddScoped<ColorsService>();
 
+// Исправленная регистрация BoxService
+builder.Services.AddScoped<IBoxService, BoxService>(); // Вместо AddScoped<BoxService>()
 
 builder.Services.AddCors(option =>
 {
@@ -82,10 +88,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 // Включаем Swagger всегда (не только в Development)
-
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -100,6 +106,5 @@ app.MapControllers();
 app.UseAuthentication();
 app.UseAuthorization();
 
-//app.MapGet("/", (ApplicationDbContext db) => db.Clients.ToList());
 app.MapGet("/", () => Results.Redirect("/swagger"));
 app.Run();

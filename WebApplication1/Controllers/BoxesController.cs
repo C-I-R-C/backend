@@ -1,14 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
+﻿// Controllers/BoxesController.cs
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using WebApplication1;
-using WebApplication1.Models;
 using WebApplication1.Services;
+using WebApplication1.Models;
 
 namespace WebApplication1.Controllers
 {
@@ -16,107 +9,58 @@ namespace WebApplication1.Controllers
     [ApiController]
     public class BoxesController : ControllerBase
     {
-        private readonly BoxService _boxService;
-        public BoxesController(BoxService boxService)
+        private readonly IBoxService _boxService;
+
+        public BoxesController(IBoxService boxService)
         {
             _boxService = boxService;
         }
+
         [HttpGet]
         public async Task<IEnumerable<Box>> GetBoxes()
         {
             return await _boxService.GetBoxes();
         }
+
         [HttpGet("{id}")]
         public async Task<ActionResult<Box>> GetBox(int id)
         {
-            try
-            {
-                return await _boxService.GetBox(id);
-            }
-            catch (DivideByZeroException)
-            {
-                return BadRequest("No such box");
-            }
-            catch
-            {
-                return Problem();
-            }
+            return await _boxService.GetBox(id);
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> PutBox(int id, Box box)
         {
-            try
-            {
-                await _boxService.PutBox(id, box);
-                return Ok();
-            }
-            catch (DivideByZeroException)
-            {
-                return BadRequest("No such box");
-            }
-            catch (ArgumentException)
-            {
-                return BadRequest("Box id != id");
-            }
-            catch
-            {
-                return Problem();
-            }
+            await _boxService.PutBox(id, box);
+            return Ok();
         }
 
         [HttpPost]
-        public async Task <ActionResult<BoxDto>> Create([FromBody] BoxCreateDto dto)
+        public async Task<ActionResult<BoxDto>> Create([FromBody] BoxCreateDto dto)
         {
-            return await _boxService.Create(dto);
+            var result = await _boxService.Create(dto);
+            return CreatedAtAction(nameof(GetBox), new { id = result.Id }, result);
         }
-
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteBox(int id)
         {
-            try
-            {
-                await _boxService.DeleteBox(id);
-                return Ok();
-            }
-            catch (DivideByZeroException)
-            {
-                return BadRequest("No such box");
-            }
-            catch
-            {
-                return Problem();
-            }
+            await _boxService.DeleteBox(id);
+            return NoContent();
         }
+
         [HttpPatch("{id}/stock")]
         public async Task<ActionResult<BoxDto>> UpdateBoxStock(
-        int id,
-        [FromBody] BoxStockUpdateDto updateDto)
+            int id,
+            [FromBody] BoxStockUpdateDto updateDto)
         {
-            try
+            if (!ModelState.IsValid)
             {
-                if (!ModelState.IsValid)
-                {
-                    return BadRequest(ModelState);
-                }
+                return BadRequest(ModelState);
+            }
 
-                var result = await _boxService.UpdateBoxStock(id, updateDto);
-                return Ok(result);
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(ex.Message);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-            catch (Exception)
-            {
-                return StatusCode(500, "Error updating box stock");
-            }
+            var result = await _boxService.UpdateBoxStock(id, updateDto);
+            return Ok(result);
         }
-        
     }
 }
