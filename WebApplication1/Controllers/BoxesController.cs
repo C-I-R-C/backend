@@ -2,11 +2,13 @@
 using Microsoft.AspNetCore.Mvc;
 using WebApplication1.Services;
 using WebApplication1.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace WebApplication1.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class BoxesController : ControllerBase
     {
         private readonly IBoxService _boxService;

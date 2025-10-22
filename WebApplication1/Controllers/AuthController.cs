@@ -1,45 +1,57 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Models;
+using Microsoft.AspNetCore.Mvc;
 using WebApplication1.Services;
 
-namespace WebApplication1.Controllers
+namespace Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class AuthController : ControllerBase
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class AuthController : ControllerBase
+    private readonly AuthService _authService;
+    private readonly ILogger<AuthController> _logger;
+
+    public AuthController(AuthService authService, ILogger<AuthController> logger)
     {
-        private readonly TokenService _tokenService;
-        public AuthController(TokenService tokenService)
-        {
-            _tokenService = tokenService;
-        }
+        _authService = authService;
+        _logger = logger;
+    }
 
-        public class LoginDto
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    {
+        try
         {
-            public required string Username { get; set; }
-            public required string Password { get; set; }
-        }
+            var result = await _authService.LoginAsync(request.Email, request.Password);
 
-        public class AuthResponseDto
-        {
-            public required string Token { get; set; }
-            public required string Username { get; set; }
-            public required string Role { get; set; }
-        }
+            if (result == null)
+                return Unauthorized("Invalid email or password");
 
-        [HttpPost("login")]
-        public ActionResult<AuthResponseDto> Login([FromBody] LoginDto loginDto)
+            return Ok(result);
+        }
+        catch (Exception ex)
         {
-            if (loginDto.Username == "admin" && loginDto.Password == "admin")
-            {
-                var token = _tokenService.GenerateToken(loginDto.Username, "Admin");
-                return new AuthResponseDto { Token = token, Username = loginDto.Username, Role = "Admin" };
-            }
-            if (loginDto.Username == "user" && loginDto.Password == "user")
-            {
-                var token = _tokenService.GenerateToken(loginDto.Username, "User");
-                return new AuthResponseDto { Token = token, Username = loginDto.Username, Role = "User" };
-            }
-            return Unauthorized("Invalid credentials");
+            _logger.LogError(ex, "Error during login");
+            return StatusCode(500, "An error occurred during login");
+        }
+    }
+
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromBody] LoginRequest request)
+    {
+        try
+        {
+            var success = await _authService.RegisterAsync(request.Email, request.Password);
+
+            if (!success)
+                return BadRequest("Registration failed");
+
+            return Ok(new { message = "User registered successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during registration");
+            return StatusCode(500, "An error occurred during registration");
         }
     }
 }
