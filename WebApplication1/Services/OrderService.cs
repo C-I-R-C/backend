@@ -14,15 +14,33 @@ namespace WebApplication1.Services
             _context = context;
         }
 
-        public async Task<List<OrderResponseDto>> GetOrders()
+        public async Task<PagedResult<OrderResponseDto>> GetOrders(PaginationParameters parameters)
         {
-            var orders = await _context.Orders
+            var query = _context.Orders
                 .Include(o => o.Client)
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Item)
+                        .ThenInclude(i => i.Box)
+                .AsQueryable();
+
+            query = query.OrderByDescending(o => o.OrderDate);
+
+            var totalCount = await query.CountAsync();
+
+            var orders = await query
+                .Skip((parameters.PageNumber - 1) * parameters.PageSize)
+                .Take(parameters.PageSize)
                 .ToListAsync();
 
-            return orders.Select(MapToOrderResponseDto).ToList();
+            var orderDtos = orders.Select(MapToOrderResponseDto).ToList();
+
+            return new PagedResult<OrderResponseDto>
+            {
+                Items = orderDtos,
+                TotalCount = totalCount,
+                PageNumber = parameters.PageNumber,
+                PageSize = parameters.PageSize
+            };
         }
         public async Task<OrderResponseDto> GetOrder(int id)
         {

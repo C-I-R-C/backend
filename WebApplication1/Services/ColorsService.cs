@@ -13,9 +13,22 @@ namespace WebApplication1.Services
             _context = context;
         }
         
-        public async Task<IEnumerable<Color>> GetColors()
+        public async Task<PagedResult<Color>> GetColors(PaginationParameters parameters)
         {
-            return await _context.Colors.ToListAsync();
+            var query = _context.Colors.AsQueryable();
+            var totalCount = await query.CountAsync();
+            var items = await query
+                    .OrderBy(b => b.Id)
+                    .Skip((parameters.PageNumber - 1) * parameters.PageSize)
+                    .Take(parameters.PageSize)
+                    .ToListAsync();
+            return new PagedResult<Color>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                PageNumber = parameters.PageNumber,
+                PageSize = parameters.PageSize
+            };
         }
 
         public async Task<Color> GetColor(int id)

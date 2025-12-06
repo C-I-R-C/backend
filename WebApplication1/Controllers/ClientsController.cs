@@ -18,9 +18,15 @@ namespace WebApplication1.Controllers
             _clientService = clientsService;
         }
         [HttpGet]
-        public async Task<ActionResult<List<ClientResponseDto>>> GetClients()
+        public async Task<ActionResult<PagedResult<ClientResponseDto>>> GetClients([FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
         {
-            return await _clientService.GetClients();
+            var parameters = new PaginationParameters
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+            return await _clientService.GetClients(parameters);
         }
 
         [HttpGet("{id}")]

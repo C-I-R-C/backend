@@ -27,13 +27,19 @@ namespace WebApplication1.Controllers
 
         // GET: api/Orders
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<OrderResponseDto>>> GetOrders()
+        public async Task<ActionResult<PagedResult<OrderResponseDto>>> GetOrders([FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
         {
-            return await _orderService.GetOrders();
+            var parameters = new PaginationParameters
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+            var result = await _orderService.GetOrders(parameters);
+            return Ok(result);
         }
 
-        // GET: api/Orders/5
-        [HttpGet("{id}")]
+            [HttpGet("{id}")]
         public async Task<ActionResult<OrderResponseDto>> GetOrder(int id)
         {
             try

@@ -26,11 +26,18 @@ namespace WebApplication1.Controllers
         }
 
         [HttpGet]
-        public async Task <ActionResult<IEnumerable<ItemFlowerDto>>> GetFlowersForItem(int itemId)
+        public async Task <ActionResult<PagedResult<ItemFlowerDto>>> GetFlowersForItem(int itemId, [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
         {
+            var parameters = new PaginationParameters
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
             try
             {
-                return await _itemFlowersService.GetFlowersForItem(itemId);
+                var result =  await _itemFlowersService.GetFlowersForItem(itemId, parameters);
+                return Ok(result);
             }
             catch (DivideByZeroException)
             {

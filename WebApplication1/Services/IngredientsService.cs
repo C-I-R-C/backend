@@ -12,9 +12,24 @@ namespace WebApplication1.Services
         {
             _context = context;
         }
-        public async Task<List<Ingredient>> GetIngredients()
+        public async Task<PagedResult<Ingredient>> GetIngredients(PaginationParameters parameters)
         {
-            return await _context.Ingredients.ToListAsync();
+            var query = _context.Ingredients.AsQueryable();
+            query = query.OrderBy(i => i.Name);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .Skip((parameters.PageNumber - 1) * parameters.PageSize)
+                .Take(parameters.PageSize)
+                .ToListAsync();
+            return new PagedResult<Ingredient>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                PageNumber = parameters.PageNumber,
+                PageSize = parameters.PageSize
+            };
         }
         public async Task<Ingredient> GetIngredient(int id)
         {

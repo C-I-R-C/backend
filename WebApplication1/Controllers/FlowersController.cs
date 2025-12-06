@@ -24,9 +24,16 @@ namespace WebApplication1.Controllers
         }
 
         [HttpGet]
-        public async Task <ActionResult<IEnumerable<FlowerDto>>> GetAll()
+        public async Task <ActionResult<PagedResult<FlowerDto>>> GetAll([FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
         {
-            return await _flowersService.GetAll();
+            var parameters = new PaginationParameters
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+            var result = await _flowersService.GetAll(parameters);
+            return Ok(result);
         }
 
         [HttpGet("{id}")]
@@ -114,7 +121,8 @@ namespace WebApplication1.Controllers
         }
 
         [HttpGet("search")]
-        public async Task<ActionResult<List<FlowerDto>>> SearchFlowersByName([FromQuery] string name)
+        public async Task<ActionResult<PagedResult<FlowerDto>>> SearchFlowersByName([FromQuery] string name, [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
         {
             try
             {
@@ -122,15 +130,15 @@ namespace WebApplication1.Controllers
                 {
                     return BadRequest("Search term cannot be empty");
                 }
-
-                var flowers = await _flowersService.GetFlowersByName(name);
-
-                if (!flowers.Any())
+                var parameters = new PaginationParameters
                 {
-                    return NotFound("No flowers found matching the search criteria");
-                }
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                };
+                var result = await _flowersService.GetFlowersByName(name, parameters);
 
-                return Ok(flowers);
+
+                return Ok(result);
             }
             catch
             {

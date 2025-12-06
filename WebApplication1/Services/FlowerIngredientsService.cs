@@ -13,29 +13,46 @@ namespace WebApplication1.Services
             _context = context;
         }
 
-        public async Task<List<FlowerIngredientDto>> GetIngredientsForFlower(int flowerId)
+        public async Task<PagedResult<FlowerIngredientDto>> GetIngredientsForFlower(int flowerId, PaginationParameters parameters)
         {
-            if (!_context.Flowers.Any(f => f.Id == flowerId))
-                throw new DivideByZeroException();
+            bool flowerExists = await _context.Flowers.AnyAsync(f => f.Id == flowerId);
+            if (!flowerExists)
+            {
+                throw new DivideByZeroException($"Flower with ID {flowerId} not found");
+            }
 
-            return await _context.FlowerIngredients
-                .Where(fi => fi.FlowerId == flowerId)
-                .Select(fi => new FlowerIngredientDto
-                {
-                    FlowerId = fi.FlowerId,
-                    IngredientId = fi.IngredientId,
-                    QuantityRequired = fi.QuantityRequired,
-                    Ingredient = _context.Ingredients
-                        .Where(i => i.Id == fi.IngredientId)
-                        .Select(i => new IngredientDto
+            var query = from fi in _context.FlowerIngredients
+                        join i in _context.Ingredients on fi.IngredientId equals i.Id
+                        where fi.FlowerId == flowerId
+                        select new FlowerIngredientDto
                         {
-                            Id = i.Id,
-                            Name = i.Name,
-                            InStock = i.InStock,
-                            CostPerUnit = i.CostPerUnit
-                        })
-                        .FirstOrDefault()
-                }).ToListAsync();
+                            FlowerId = fi.FlowerId,
+                            IngredientId = fi.IngredientId,
+                            QuantityRequired = fi.QuantityRequired,
+                            Ingredient = new IngredientDto
+                            {
+                                Id = i.Id,
+                                Name = i.Name,
+                                InStock = i.InStock,
+                                CostPerUnit = i.CostPerUnit
+                            }
+                        };
+            query = query.OrderBy(dto => dto.Ingredient.Name);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .Skip((parameters.PageNumber - 1) * parameters.PageSize)
+                .Take(parameters.PageSize)
+                .ToListAsync();
+
+            return new PagedResult<FlowerIngredientDto>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                PageNumber = parameters.PageNumber,
+                PageSize = parameters.PageSize
+            };
         }
 
         public async Task<ActionResult<FlowerIngredient>> GetFlowerIngredient(int id)

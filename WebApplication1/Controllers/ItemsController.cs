@@ -24,14 +24,19 @@ namespace WebApplication1.Controllers
             _itemsService = itemsService;
         }
 
-        // GET: api/Items
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ItemResponseDto>>> GetItems()
+        public async Task<ActionResult<PagedResult<ItemResponseDto>>> GetItems([FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
         {
-            return await _itemsService.GetItems();    
+            var parameters = new PaginationParameters
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+            var result = await _itemsService.GetItems(parameters);
+            return Ok(result);
         }
 
-        // GET: api/Items/5
         [HttpGet("{id}")]
         public async Task<ActionResult<ItemResponseDto>> GetItem(int id)
         {

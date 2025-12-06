@@ -14,7 +14,7 @@ namespace WebApplication1
         [RegularExpression(@"^\+?[0-9]{7,15}$", ErrorMessage = "Invalid phone number format")]
         public string? PhoneNumber { get; set; }
 
-        [Range(0, 10, ErrorMessage = "Discount level must be between 0 and 100")]
+        [Range(0, 100, ErrorMessage = "Discount level must be between 0 and 100")]
         public int DiscountLevel { get; set; } = 0;
     }
 }

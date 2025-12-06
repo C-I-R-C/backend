@@ -27,11 +27,18 @@ namespace WebApplication1.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<FlowerIngredientDto>>> GetIngredientsForFlower(int flowerId)
+        public async Task<ActionResult<PagedResult<FlowerIngredientDto>>> GetIngredientsForFlower(int flowerId, [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
         {
+            var parameters = new PaginationParameters
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
             try
             {
-                return await _flowerIngredientsService.GetIngredientsForFlower(flowerId);
+                var result = await _flowerIngredientsService.GetIngredientsForFlower(flowerId, parameters);
+                return Ok(result);
             }
             catch (DivideByZeroException)
             {

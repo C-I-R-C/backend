@@ -14,37 +14,57 @@ namespace WebApplication1.Services
             _data = context;
         }
 
-        public async Task<List<ItemFlowerDto>> GetFlowersForItem(int itemId)
+        public async Task<PagedResult<ItemFlowerDto>> GetFlowersForItem(
+    int itemId,
+    PaginationParameters parameters)
         {
-            if (!_data.Items.Any(i => i.Id == itemId))
-                throw new DivideByZeroException();
-
-            var itemFlowers = _data.ItemFlowers
-                .Where(itemf => itemf.ItemId == itemId)
-            .Select(itemf => new ItemFlowerDto
+            // Используем AnyAsync для асинхронной проверки
+            bool itemExists = await _data.Items.AnyAsync(i => i.Id == itemId);
+            if (!itemExists)
             {
-                ItemId = itemf.ItemId,
-                FlowerId = itemf.FlowerId,
-                Quantity = itemf.Quantity,
-                Flower = _data.Flowers
-                    .Where(f => f.Id == itemf.FlowerId)
-                    .Select(f => new FlowerDto
-                    {
-                        Id = f.Id,
-                        Name = f.Name,
-                        InStock = f.InStock,
-                        CostPerUnit = f.CostPerUnit,
-                        Color = f.Color != null ? new ColorDto
-                        {
-                            Id = f.Color.Id,
-                            Name = f.Color.Name,
-                            IsNatural = f.Color.IsNatural
-                        } : null
-                    })
-                    .FirstOrDefault()
-            });
+                throw new DivideByZeroException($"Item with ID {itemId} not found");
+            }
 
-            return await itemFlowers.ToListAsync();
+            var query = from itemf in _data.ItemFlowers
+                        join f in _data.Flowers on itemf.FlowerId equals f.Id
+                        join c in _data.Colors on f.ColorId equals c.Id into flowerColor
+                        from color in flowerColor.DefaultIfEmpty()
+                        where itemf.ItemId == itemId
+                        select new ItemFlowerDto
+                        {
+                            ItemId = itemf.ItemId,
+                            FlowerId = itemf.FlowerId,
+                            Quantity = itemf.Quantity,
+                            Flower = new FlowerDto
+                            {
+                                Id = f.Id,
+                                Name = f.Name,
+                                InStock = f.InStock,
+                                CostPerUnit = f.CostPerUnit,
+                                Color = color != null ? new ColorDto
+                                {
+                                    Id = color.Id,
+                                    Name = color.Name,
+                                    IsNatural = color.IsNatural
+                                } : null
+                            }
+                        };
+            query = query.OrderBy(dto => dto.Flower.Name);
+
+            var totalCount = await query.CountAsync();
+
+            var result = await query
+                .Skip((parameters.PageNumber - 1) * parameters.PageSize)
+                .Take(parameters.PageSize)
+                .ToListAsync();
+
+            return new PagedResult<ItemFlowerDto>
+            {
+                Items = result,
+                TotalCount = totalCount,
+                PageNumber = parameters.PageNumber,
+                PageSize = parameters.PageSize
+            };
         }
         public async Task<ItemFlowerDto> AddFlowerToItem(int itemId, [FromBody] AddFlowerToItemDto dto)
         {

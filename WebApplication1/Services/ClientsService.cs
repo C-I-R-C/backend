@@ -13,26 +13,46 @@ namespace WebApplication1.Services
             _context = context;
         }
 
-        public async Task<List<ClientResponseDto>> GetClients()
+        public async Task<PagedResult<ClientResponseDto>> GetClients(PaginationParameters parameters)
         {
-            var clients = await _context.Clients
-                .Select(c => new ClientResponseDto
-                {
-                    Id = c.Id,
-                    Name = c.Name,
-                    PhoneNumber = c.PhoneNumber,
-                    TotalOrdersCount = c.TotalOrdersCount,
-                    DiscountLevel = c.DiscountLevel,
-                    TotalSpent = _context.Orders
-                        .Where(o => o.ClientId == c.Id)
-                        .Sum(o => o.TotalPrice),
-                    LastOrderDate = _context.Orders
-                        .Where(o => o.ClientId == c.Id)
-                        .Max(o => (DateTime?)o.OrderDate)
-                })
+            var query = from client in _context.Clients
+                        join order in _context.Orders
+                            on client.Id equals order.ClientId into clientOrders
+                        from co in clientOrders.DefaultIfEmpty()
+                        group co by new
+                        {
+                            client.Id,
+                            client.Name,
+                            client.PhoneNumber,
+                            client.TotalOrdersCount,
+                            client.DiscountLevel
+                        } into g
+                        select new ClientResponseDto
+                        {
+                            Id = g.Key.Id,
+                            Name = g.Key.Name,
+                            PhoneNumber = g.Key.PhoneNumber,
+                            TotalOrdersCount = g.Key.TotalOrdersCount,
+                            DiscountLevel = g.Key.DiscountLevel,
+                            TotalSpent = g.Sum(o => o != null ? o.TotalPrice : 0),
+                            LastOrderDate = g.Max(o => o != null ? o.OrderDate : (DateTime?)null)
+                        };
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(c => c.Name) // или другой порядок
+                .Skip((parameters.PageNumber - 1) * parameters.PageSize)
+                .Take(parameters.PageSize)
                 .ToListAsync();
 
-            return clients;
+            return new PagedResult<ClientResponseDto>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                PageNumber = parameters.PageNumber,
+                PageSize = parameters.PageSize
+            };
         }
         public async Task<ClientResponseDto> GetClient(int id)
         {

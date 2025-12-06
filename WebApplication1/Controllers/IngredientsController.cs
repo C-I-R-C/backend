@@ -25,12 +25,19 @@ namespace WebApplication1.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Ingredient>>> GetIngredients()
+        public async Task<ActionResult<PagedResult<Ingredient>>> GetIngredients([FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
         {
-            return Ok(await _ingredientsService.GetIngredients());
+            var parameters = new PaginationParameters
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+            var result = await _ingredientsService.GetIngredients(parameters);
+            return Ok(result);
         }
 
-        [HttpGet("{id}")]
+            [HttpGet("{id}")]
         public async Task<ActionResult<Ingredient>> GetIngredient(int id)
         {
             try

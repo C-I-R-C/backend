@@ -8,7 +8,7 @@ namespace WebApplication1.Services
 {
     public interface IBoxService
     {
-        Task<IEnumerable<Box>> GetBoxes();
+        Task<PagedResult<Box>> GetBoxes(PaginationParameters parameters);
         Task<Box> GetBox(int id);
         Task PutBox(int id, Box box);
         Task<BoxDto> Create(BoxCreateDto dto);
@@ -27,11 +27,27 @@ namespace WebApplication1.Services
             _logger = logger;
         }
 
-        public async Task<IEnumerable<Box>> GetBoxes()
+        public async Task<PagedResult<Box>> GetBoxes(PaginationParameters parameters)
         {
             try
             {
-                return await _context.Boxes.ToListAsync();
+                var query = _context.Boxes.AsQueryable();
+
+                var totalCount = await query.CountAsync();
+
+                var items = await query
+                    .OrderBy(b => b.Id) 
+                    .Skip((parameters.PageNumber - 1) * parameters.PageSize)
+                    .Take(parameters.PageSize)
+                    .ToListAsync();
+
+                return new PagedResult<Box>
+                {
+                    Items = items,
+                    TotalCount = totalCount,
+                    PageNumber = parameters.PageNumber,
+                    PageSize = parameters.PageSize
+                };
             }
             catch (Exception ex)
             {

@@ -25,9 +25,16 @@ namespace WebApplication1.Controllers
             _colorsService = colorsService;
         }
         [HttpGet]
-        public async Task<IEnumerable<Color>> GetColors()
+        public async Task<ActionResult<PagedResult<Color>>> GetColors([FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
         {
-            return await _colorsService.GetColors();
+            var parameters = new PaginationParameters
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+            var result = await _colorsService.GetColors(parameters);
+            return Ok(result);
         }
 
         [HttpGet("{id}")]

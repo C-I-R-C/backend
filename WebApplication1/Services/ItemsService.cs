@@ -13,13 +13,23 @@ namespace WebApplication1.Services
             _context = context;
         }
 
-        public async Task<List<ItemResponseDto>> GetItems()
+        public async Task<PagedResult<ItemResponseDto>> GetItems(PaginationParameters parameters)
         {
-            var items = await _context.Items
+            var query = _context.Items
                 .Include(i => i.Box)
                 .Include(i => i.ItemFlowers)
                     .ThenInclude(itemf => itemf.Flower)
-                        .ToListAsync();
+                .AsQueryable();
+
+            // Сортировка по умолчанию
+            query = query.OrderBy(i => i.Name);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .Skip((parameters.PageNumber - 1) * parameters.PageSize)
+                .Take(parameters.PageSize)
+                .ToListAsync();
 
             var itemDtos = items.Select(i => new ItemResponseDto
             {
@@ -30,17 +40,24 @@ namespace WebApplication1.Services
                 {
                     Id = i.Box.Id,
                     Name = i.Box.Name,
-                    InStock = i.Box.InStock
+                    InStock = i.Box.InStock,
+                    CostPerUnit = i.Box.CostPerUnit 
                 } : null,
                 Flowers = i.ItemFlowers.Select(itemf => new ItemFlowerDetailDto
                 {
-                    FlowerId = itemf.Flower.Id,
-                    FlowerName = itemf.Flower.Name,
-                    Quantity = itemf.Quantity
+                    FlowerId = itemf.FlowerId,
+                    FlowerName = itemf.Flower?.Name ?? "Unknown",
+                    Quantity = itemf.Quantity,
                 }).ToList()
             }).ToList();
 
-            return itemDtos;
+            return new PagedResult<ItemResponseDto>
+            {
+                Items = itemDtos,
+                TotalCount = totalCount,
+                PageNumber = parameters.PageNumber,
+                PageSize = parameters.PageSize
+            };
         }
         public async Task<ItemResponseDto> GetItem(int id)
         {

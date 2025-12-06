@@ -13,9 +13,9 @@ namespace WebApplication1.Services
             _data = context;
         }
 
-        public async Task<List<FlowerDto>> GetAll()
+        public async Task<PagedResult<FlowerDto>> GetAll(PaginationParameters parameters)
         {
-            var flowers = _data.Flowers.Select(f => new FlowerDto
+            var query = _data.Flowers.Select(f => new FlowerDto
             {
                 Id = f.Id,
                 Name = f.Name,
@@ -28,8 +28,22 @@ namespace WebApplication1.Services
                     IsNatural = f.Color.IsNatural
                 } : null
             });
+            query = query.OrderBy(f => f.Name);
 
-            return await flowers.ToListAsync();
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .Skip((parameters.PageNumber - 1) * parameters.PageSize)
+                .Take(parameters.PageSize)
+                .ToListAsync();
+
+            return new PagedResult<FlowerDto>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                PageNumber = parameters.PageNumber,
+                PageSize = parameters.PageSize
+            };
         }
         public async Task<FlowerWithIngredientsDto> GetById(int id)
         {
@@ -192,13 +206,25 @@ namespace WebApplication1.Services
                 throw;
             }
         }
-        public async Task<List<FlowerWithIngredientsDtoNew>> GetFlowersByName(string name)
+        public async Task<PagedResult<FlowerWithIngredientsDtoNew>> GetFlowersByName(
+    string name,
+    PaginationParameters parameters)
         {
-            return await _data.Flowers
+            var query = _data.Flowers
                 .Where(f => f.Name.ToLower().Contains(name.ToLower()))
                 .Include(f => f.Color)
                 .Include(f => f.FlowerIngredients)
                     .ThenInclude(fi => fi.Ingredient)
+                .AsQueryable();
+
+            // Сортировка по умолчанию
+            query = query.OrderBy(f => f.Name);
+
+            var totalCount = await query.CountAsync();
+
+            var flowers = await query
+                .Skip((parameters.PageNumber - 1) * parameters.PageSize)
+                .Take(parameters.PageSize)
                 .Select(f => new FlowerWithIngredientsDtoNew
                 {
                     Id = f.Id,
@@ -220,6 +246,14 @@ namespace WebApplication1.Services
                     }).ToList()
                 })
                 .ToListAsync();
+
+            return new PagedResult<FlowerWithIngredientsDtoNew>
+            {
+                Items = flowers,
+                TotalCount = totalCount,
+                PageNumber = parameters.PageSize > 0 ? parameters.PageNumber : 1,
+                PageSize = parameters.PageSize
+            };
         }
     }
 }

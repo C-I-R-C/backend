@@ -19,9 +19,18 @@ namespace WebApplication1.Controllers
         }
 
         [HttpGet]
-        public async Task<IEnumerable<Box>> GetBoxes()
+        public async Task<ActionResult<PagedResult<Box>>> GetBoxes(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
         {
-            return await _boxService.GetBoxes();
+            var parameters = new PaginationParameters
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+
+            var result = await _boxService.GetBoxes(parameters);
+            return Ok(result);
         }
 
         [HttpGet("{id}")]
