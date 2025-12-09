@@ -2,19 +2,31 @@
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Models;
 
+
+
 namespace WebApplication1.Services
 {
+
     public class ClientsService
     {
+
         private readonly ApplicationDbContext _context;
+
 
         public ClientsService(ApplicationDbContext context)
         {
+
             _context = context;
+
         }
 
-        public async Task<PagedResult<ClientResponseDto>> GetClients(PaginationParameters parameters)
+
+        public async Task<PagedResult<ClientResponseDto>> 
+            GetClients(
+                PaginationParameters parameters )
+
         {
+
             var query = from client in _context.Clients
                         join order in _context.Orders
                             on client.Id equals order.ClientId into clientOrders
@@ -38,6 +50,7 @@ namespace WebApplication1.Services
                             LastOrderDate = g.Max(o => o != null ? o.OrderDate : (DateTime?)null)
                         };
 
+
             var totalCount = await query.CountAsync();
 
             var items = await query
@@ -46,6 +59,7 @@ namespace WebApplication1.Services
                 .Take(parameters.PageSize)
                 .ToListAsync();
 
+
             return new PagedResult<ClientResponseDto>
             {
                 Items = items,
@@ -53,9 +67,16 @@ namespace WebApplication1.Services
                 PageNumber = parameters.PageNumber,
                 PageSize = parameters.PageSize
             };
+
         }
-        public async Task<ClientResponseDto> GetClient(int id)
+
+
+        public async Task<ClientResponseDto> 
+            GetClient(
+                int id )
+
         {
+
             var client = await _context.Clients
                 .Where(c => c.Id == id)
                 .Select(c => new ClientResponseDto
@@ -74,17 +95,25 @@ namespace WebApplication1.Services
                 })
                 .FirstOrDefaultAsync();
 
+
             if (client == null)
             {
+
                 throw new DivideByZeroException();
+
             }
+
 
             return client;
             
         }
         
-        public async Task<ClientResponseDto> Create([FromBody] ClientCreateDto clientDto)
+        public async Task<ClientResponseDto> 
+            Create(
+                [FromBody] ClientCreateDto clientDto )
+
         {
+
             var client = new Client
             {
                 Name = clientDto.Name,
@@ -93,8 +122,11 @@ namespace WebApplication1.Services
                 TotalOrdersCount = 0
             };
 
+
             _context.Clients.Add(client);
             await _context.SaveChangesAsync();
+            
+            
             return 
                 new ClientResponseDto
                 {
@@ -104,73 +136,134 @@ namespace WebApplication1.Services
                     TotalOrdersCount = 0,
                     DiscountLevel = client.DiscountLevel
                 };
+
         }
-        public async Task DeleteClient(int id)
+
+
+        public async Task 
+            DeleteClient(
+                int id )
+
         {
+
             var client = await _context.Clients.FindAsync(id);
+
+
             if (client == null)
             {
+
                 throw new DivideByZeroException();
+
             }
 
             _context.Clients.Remove(client);
             await _context.SaveChangesAsync();
 
         }
-        public async Task PutClient(int id, [FromBody] ClientUpdateDto clientDto)
+
+
+        public async Task 
+            PutClient(
+                int id, 
+                [FromBody] ClientUpdateDto clientDto )
+
         {
 
+
             if (id != clientDto.Id)
+            {
+
                 throw new ArgumentException();
+            
+            }
 
 
-            var client = await _context.Clients.FindAsync(id);
-            if (client == null)
-                throw new DivideByZeroException();
+            var client = await _context.Clients.FindAsync(id) ?? throw new DivideByZeroException();
+
 
             if (!string.IsNullOrWhiteSpace(clientDto.Name))
+            {
+             
                 client.Name = clientDto.Name.Trim();
+            
+            }
+
 
             if (!string.IsNullOrWhiteSpace(clientDto.PhoneNumber))
+            {
+             
                 client.PhoneNumber = clientDto.PhoneNumber.Trim();
+
+            }
+
 
             if (clientDto.DiscountLevel.HasValue)
             {
 
                 if (clientDto.DiscountLevel < 0 || clientDto.DiscountLevel > 100)
+                {
+                 
                     throw new AbandonedMutexException();
+                
+                }
+
 
                 client.DiscountLevel = clientDto.DiscountLevel.Value;
+            
             }
-                await _context.SaveChangesAsync();
+
+            await _context.SaveChangesAsync();
+
         }
-        private OrderResponseDto MapToOrderResponseDto(Order order)
+
+
+        private OrderResponseDto 
+            MapToOrderResponseDto(
+                Order order)
+
         {
+
             return new OrderResponseDto
             {
+
                 Id = order.Id,
+
                 OrderDate = order.OrderDate,
+
                 TotalPrice = order.TotalPrice,
+
                 IsCurrent = order.IsCurrent,
+
                 Comment = order.Comment,
+
                 Client = order.Client != null ? new ClientInfoDto
                 {
                     Id = order.Client.Id,
                     Name = order.Client.Name,
                     DiscountLevel = order.Client.DiscountLevel
                 } : null,
+
                 Items = order.OrderItems?.Select(oi => new OrderItemWithDetailsDto
                 {
+
                     Id = oi.Id,
+
                     Quantity = oi.Quantity,
+
                     UnitPrice = oi.UnitPrice,
+
                     Item = oi.Item != null ? new ItemDto
                     {
+
                         Id = oi.Item.Id,
+
                         Name = oi.Item.Name,
+
                         BasePrice = oi.Item.BasePrice
+
                     } : null,
-                    Flowers = _context.ItemFlowers
+
+                    Flowers = [.. _context.ItemFlowers
                     .Where(itemf => itemf.ItemId == oi.ItemId)
                     .Include(itemf => itemf.Flower)
                         .ThenInclude(f => f.Color)
@@ -179,14 +272,21 @@ namespace WebApplication1.Services
                             .ThenInclude(fi => fi.Ingredient)
                     .Select(itemf => new FlowerDetailDto
                     {
+
                         FlowerId = itemf.FlowerId,
+
                         FlowerName = itemf.Flower != null ? itemf.Flower.Name : "Unknown",
+
                         QuantityPerItem = itemf.Quantity,
+
                         TotalQuantity = itemf.Quantity * oi.Quantity,
+
                         UnitCost = itemf.Flower != null ? itemf.Flower.CostPerUnit : 0,
+
                         Color = itemf.Flower != null && itemf.Flower.Color != null
                             ? itemf.Flower.Color.Name
                             : "N/A",
+
                         Ingredients = itemf.Flower != null && itemf.Flower.FlowerIngredients != null
                             ? itemf.Flower.FlowerIngredients
                                 .Select(fi => new IngredientDto
@@ -198,20 +298,28 @@ namespace WebApplication1.Services
                                 })
                                 .ToList()
                             : new List<IngredientDto>()
-                    })
-                    .ToList()
-                }).ToList() ?? new List<OrderItemWithDetailsDto>()
+
+                    })]
+                }).ToList() ?? []
+
             };
+
         }
-        public async Task<List<ClientWithDetailedOrdersDto>> SearchClients(
-        string searchTerm,
-        bool? onlyCompletedOrders = null)
+
+
+        public async Task<List<ClientWithDetailedOrdersDto>> 
+            SearchClients(
+                string searchTerm,
+                bool? onlyCompletedOrders = null)
+
         {
+
             var query = _context.Clients
                 .Include(c => c.Orders)
                     .ThenInclude(o => o.OrderItems)
                         .ThenInclude(oi => oi.Item)
                 .AsQueryable();
+
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
@@ -220,23 +328,29 @@ namespace WebApplication1.Services
                     c.PhoneNumber.Contains(searchTerm));
             }
 
+
             var clients = await query.ToListAsync();
 
-            return clients.Select(c => new ClientWithDetailedOrdersDto
+
+            return [.. clients.Select(c => new ClientWithDetailedOrdersDto
             {
                 Id = c.Id,
                 Name = c.Name,
                 PhoneNumber = c.PhoneNumber,
                 TotalOrdersCount = c.TotalOrdersCount,
                 DiscountLevel = c.DiscountLevel,
-                Orders = c.Orders
+                Orders = [.. c.Orders
                     .Where(o => onlyCompletedOrders == null ||
                                o.IsCurrent == !onlyCompletedOrders.Value)
-                    .Select(o => MapToOrderResponseDto(o))
-                    .ToList()
-            }).ToList();
+                    .Select(o => MapToOrderResponseDto(o))]
+            })];
+
         }
+
+
     }
+
+
 
 }
 
