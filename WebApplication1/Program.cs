@@ -60,7 +60,6 @@ builder.Services.AddScoped<ItemFlowersService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<ColorsService>();
 builder.Services.AddScoped<IBoxService, BoxService>();
-builder.Services.AddScoped<ImageService>();
 
 builder.Services.AddHttpClient<AuthService>(client =>
 {

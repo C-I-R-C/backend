@@ -39,11 +39,6 @@ namespace WebApplication1.Services
                     Name = f.Color.Name,
                     IsNatural = f.Color.IsNatural
                 } : null
-                ,
-                ImageUrl = _data.Images
-                    .Where(i => i.EntityType == "Flower" && i.EntityId == f.Id)
-                    .Select(i => i.Url)
-                    .FirstOrDefault()
             });
 
             query = query.OrderBy(f => f.Name);
@@ -84,11 +79,6 @@ namespace WebApplication1.Services
             }
 
 
-            var imageUrl = await _data.Images
-                .Where(i => i.EntityType == "Flower" && i.EntityId == id)
-                .Select(i => i.Url)
-                .FirstOrDefaultAsync();
-
             return new FlowerWithIngredientsDto
             {
                 Id = flower.Id,
@@ -123,9 +113,7 @@ namespace WebApplication1.Services
                                 CostPerUnit = i.CostPerUnit
                             })
                             .FirstOrDefault()
-                    })],
-
-                ImageUrl = imageUrl
+                    })]
 
             };
 

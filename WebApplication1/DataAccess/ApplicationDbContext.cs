@@ -27,7 +27,6 @@ namespace WebApplication1
         public DbSet<Ingredient> Ingredients { get; set; }
         public DbSet<FlowerIngredient> FlowerIngredients { get; set; }
         public DbSet<Color> Colors { get; set; }
-        public DbSet<Image> Images { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

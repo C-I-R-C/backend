@@ -19,9 +19,6 @@ namespace WebApplication1
 
         public ColorDto? Color { get; set; }
 
-
-        public string? ImageUrl { get; set; }
-
     }
 
 }

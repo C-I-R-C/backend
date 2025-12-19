@@ -228,33 +228,4 @@ namespace WebApplication1.Models
 
     }
 
-
-    public class Image
-    {
-
-        public int Id { get; set; }
-
-
-        public string? FileName { get; set; }
-
-
-        public string? Url { get; set; }
-
-
-        public byte[]? Data { get; set; }
-
-
-        public string? ContentType { get; set; }
-
-
-        public string? EntityType { get; set; }
-
-
-        public int EntityId { get; set; }
-
-
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-    }
-
 }
