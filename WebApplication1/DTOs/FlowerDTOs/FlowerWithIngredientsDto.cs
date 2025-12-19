@@ -21,6 +21,9 @@ namespace WebApplication1
 
         public List<FlowerIngredientDto> Ingredients { get; set; } = [];
 
+
+        public string? ImageUrl { get; set; }
+
     }
 
 }
